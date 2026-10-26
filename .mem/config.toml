@@ -1,0 +1,11 @@
+schema = 2
+name = 'learnharness'
+description = 'Personal fork of LearnHarness (amosblomqvist/learnharness), an agent harness for learning; main mirrors upstream'
+
+[git]
+remote = 'origin'
+development = 'dev'
+staging = 'test'
+production = 'release'
+base = 'main'
+protect = true

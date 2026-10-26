@@ -1,0 +1,19 @@
+#!/bin/sh
+# Keeps this fork's main an exact mirror of amosblomqvist/learnharness and reports how much of it
+# dev has not merged. main is never committed to: dev takes upstream in by merge commit ([git] base).
+
+fork=Benjamin-van-Heerden/learnharness
+
+if ! command -v gh >/dev/null 2>&1; then
+	echo "⚠️ gh is not installed, so main was not synced from upstream. Sync it on GitHub (Sync fork) or install gh."
+elif ! out=$(gh repo sync "$fork" --branch main 2>&1); then
+	echo "⚠️ Could not fast-forward the fork's main from upstream: $(printf '%s' "$out" | head -n 1). If main has commits of its own it is no longer a mirror; tell the user."
+fi
+
+git fetch -q origin main 2>/dev/null
+latest=$(git log -1 --format='%h %s, %cr' origin/main 2>/dev/null)
+missing=$(git rev-list --count dev..origin/main 2>/dev/null || echo 0)
+echo "main mirrors upstream at $latest; dev lacks $missing of its commits."
+if [ "$missing" -gt 0 ]; then
+	echo "After merging them (only when the user asks; see the Base line), run \`npm install\` if package-lock.json changed, then \`npm test\`, and check docs/ and AGENTS.md below the mem block for upstream's changed conventions."
+fi
