@@ -509,6 +509,15 @@ function setupAutoUpdater() {
 		reportUpdateStatus("disabled");
 		return;
 	}
+	// FORK LOCAL BUILDS NEVER UPDATE: scripts/desktop-local.sh stamps
+	// lhLocalBuild into the packaged package.json (electron-builder
+	// extraMetadata). The baked feed is upstream's releases, which would
+	// replace this build; the owner rebuilds from the release branch instead.
+	if (require("../package.json").lhLocalBuild === true) {
+		log("auto-update: local build — updater disabled");
+		reportUpdateStatus("disabled");
+		return;
+	}
 	try {
 		autoUpdater = require("electron-updater").autoUpdater;
 	} catch (err) {

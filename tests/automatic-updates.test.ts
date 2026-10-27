@@ -13,9 +13,10 @@ const mainFile = fileURLToPath(new URL("../electron/main.cjs", import.meta.url))
 const mainSource = readFileSync(mainFile, "utf8");
 const mainRequire = createRequire(mainFile);
 
-function fixture({ packaged = true, updaterMissing = false } = {}) {
+function fixture({ packaged = true, updaterMissing = false, localBuild = false } = {}) {
 	let settings: string | Error = JSON.stringify({ version: 1, general: { autoUpdate: true } });
 	const settingsReads: string[] = [];
+	let updaterRequires = 0;
 	const order: string[] = [];
 	const intervals: { callback: () => void; delay: number }[] = [];
 	const handles = new Map<string, (event: unknown) => unknown>();
@@ -87,7 +88,9 @@ function fixture({ packaged = true, updaterMissing = false } = {}) {
 	const context = createContext({
 		require: (id: string) => {
 			if (id === "electron") return electron;
+			if (id === "../package.json") return localBuild ? { ...mainRequire(id), lhLocalBuild: true } : mainRequire(id);
 			if (id === "electron-updater") {
+				updaterRequires++;
 				if (updaterMissing) throw new Error("missing updater");
 				return { autoUpdater: updater };
 			}
@@ -110,6 +113,7 @@ function fixture({ packaged = true, updaterMissing = false } = {}) {
 	const run = (code: string) => runInContext(code, context);
 	return {
 		run, updater, windows, intervals, handles, settingsReads, order, app,
+		updaterRequires: () => updaterRequires,
 		setSettings: (value: unknown) => { settings = JSON.stringify(value); },
 		setSettingsFailure: (value: string | Error) => { settings = value; },
 		setEnumerationFailure: (value: boolean) => { enumerationFails = value; },
@@ -171,6 +175,21 @@ describe("automatic-update preference gate", () => {
 			assert.equal(f.state().status, "disabled");
 		});
 	}
+
+	it("a fork local build never loads the updater, checks, or reads the preference", async () => {
+		const f = fixture({ localBuild: true });
+		f.run("setupAutoUpdater()"); await f.check(true); await f.check();
+		assert.equal(f.updaterRequires(), 0);
+		assert.equal(f.updater.checks, 0);
+		assert.equal(f.settingsReads.length, 0);
+		assert.equal(f.state().status, "disabled");
+	});
+
+	it("an unmarked packaged build still loads the updater", async () => {
+		const f = fixture(); f.run("setupAutoUpdater()"); await f.check(true);
+		assert.equal(f.updaterRequires(), 1);
+		assert.equal(f.updater.checks, 1);
+	});
 });
 
 describe("status observation never controls the updater", () => {
