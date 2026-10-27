@@ -1,8 +1,13 @@
 ---
 title: Add desktop:local build-and-install script
-status: todo
+status: completed
 created_at: "2026-10-27T12:06:57+02:00"
-updated_at: "2026-10-27T12:06:57+02:00"
+updated_at: "2026-10-27T12:14:04+02:00"
+completed_at: "2026-10-27T12:14:04+02:00"
 ---
 
 Spec section 2. Create scripts/desktop-local.sh (bash, set -euo pipefail) and the package.json script 'desktop:local': 'bash scripts/desktop-local.sh'. Persistent worktree of origin/release (detached) at ../learnharness-release (sibling of the repo, never inside it); refuse a dirty worktree. npm ci on first run or when package-lock.json changed (stamp file in node_modules). Steps: rm -rf dist .next/standalone; next build; node scripts/smoke-provider-runtime.mjs; node scripts/build-server.mjs; node scripts/smoke-server.mjs; DEVELOPER_DIR default /Applications/Xcode.app/Contents/Developer; npx electron-builder --mac --arm64 --dir --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false -c.extraMetadata.lhLocalBuild=true. Install: quit a running LearnHarness via osascript and wait, replace /Applications/LearnHarness.app with dist/mac-arm64/LearnHarness.app (rm old, ditto), print version and built commit. Any failure stops before touching the installed app. Verify the build steps work by running them once against a throwaway worktree of the current dev HEAD (not installing into /Applications), and check codesign -dv shows an ad-hoc signature and the packaged package.json contains lhLocalBuild.
+
+## Completion Notes
+
+Added scripts/desktop-local.sh and npm run desktop:local: builds origin/release in a persistent detached worktree at ../learnharness-release (refuses tracked edits there), npm ci only when package-lock.json changes, runs next build, the provider-runtime smoke, build-server and the server smoke under Electron's Node (--electron, as CI does), then electron-builder --dir with an ad-hoc signature, hardened runtime and notarization off, and lhLocalBuild stamped into the packaged package.json; then quits a running LearnHarness via osascript, waits for every process, and replaces /Applications/LearnHarness.app with ditto. next build rewrites next-env.d.ts, so the script restores it to keep the worktree clean. Verified with a copy of the script pinned to the current dev commit and the install step removed: every gate passed, codesign shows Signature=adhoc and verifies, the packaged package.json carries lhLocalBuild: true, the built app launched from dist/ with data in ~/Library/Application Support/LearnHarness/data and logged 'auto-update: local build — updater disabled', and the osascript quit left no processes after 2s. The install step itself runs for the first time in the final task.
