@@ -3,7 +3,7 @@
 ## Overview
 LearnHarness is a learning app: a Next.js 16 (App Router) server and React UI, also packaged as an Electron desktop app. A teacher agent runs lessons as chat sessions. The first turns probe the learner (prober agent); after `probe_done` the teacher agent plans with `plan_init` and teaches with quiz/explain questions. Practice sessions run a separate practice agent. Teaching transcripts are extracted into a persistent knowledge graph of propositions and reasoning chains, which is the home page.
 
-This repository is a personal fork of `amosblomqvist/learnharness` (AGPL-3.0-only). `main` mirrors upstream exactly, `dev` is the development branch, `test` is staging and `release` is production (`.mem/config.toml`, `[git] base = 'main'`). `.mem/runnables/upstream` fast-forwards the fork's `main` from upstream at each onboard.
+This repository is a personal fork of `amosblomqvist/learnharness` (AGPL-3.0-only). `main` mirrors upstream exactly, `dev` is the development branch, `test` is staging and `release` is production (`.mem/config.toml`, `[git] base = 'main'`); the daily desktop app is built from `release`. The build, change and upstream-intake loop is in `docs/fork-workflow.md`; `docs/architecture.md` is the canonical architecture spec and describes this fork's code.
 
 ## Tech Stack
 - TypeScript (strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`), ES modules (`"type": "module"`); Electron main process files are CommonJS (`electron/*.cjs`).
@@ -42,14 +42,16 @@ electron/            desktop main process, preload, subscription/ChatGPT owners 
 scripts/             build/packaging guards, smoke tests, one-shot data scripts
 skills/learnharness/ standalone Python skill for reading a user's LearnHarness data
 tests/               flat test directory; fixtures/ holds golden data, PDFs, tool-rendering JSON
-docs/                upstream design docs (architecture.md, development.md, vision.md, ...)
+docs/                design docs: architecture.md (ours), fork-workflow.md (ours), development.md, vision.md, ...
 lib/utils.ts         cn() only (clsx + tailwind-merge)
 config.ts            path constants and model-role types (repo root)
 proxy.ts             Next 16 proxy guarding /api/* in desktop mode
 public/              fonts, audio worklet (pcm-capture.js)
 build/               desktop icons
 data/                runtime state, git-ignored (relocated by LH_DATA_DIR)
-.mem/                mem config, runnables, this doc
+.mem/                mem config, specs, this doc; runnables/ run at onboard:
+                     upstream (waiting upstream releases + risk areas),
+                     architecture (outline of docs/architecture.md)
 ```
 Generated or local, never committed: `node_modules/`, `.next/`, `dist/`, `data/`, `.fresh-data/`, `auth.json`, `*-credentials.json*`, `.env.local`.
 
@@ -123,7 +125,8 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 ## Entry Points
 - Web dev: `npm run dev` (http://localhost:3000). Production web: `npm run build` then `npm start`.
 - Desktop dev: `npm run desktop:dev` (Next dev + Electron pointed at it, `LH_DEV_URL`).
-- Desktop package: `electron/main.cjs` spawns `.next/standalone/server.js` on loopback; built by `npm run desktop:dist` (macOS arm64, signed/notarized).
+- Desktop package: `electron/main.cjs` spawns `.next/standalone/server.js` on loopback. Upstream's signed/notarized build is `npm run desktop:dist` (needs upstream's Apple credentials).
+- Fork daily app: `npm run desktop:local` (`scripts/desktop-local.sh`) builds `origin/release` in the sibling worktree `../learnharness-release` (ad-hoc signed, not notarized, `lhLocalBuild` so the auto-updater is off) and installs `/Applications/LearnHarness.app`. Its data lives in `~/Library/Application Support/LearnHarness/`.
 - Fresh-user simulation: `npm run dev:fresh` (`scripts/dev-fresh.sh`, uses `.fresh-data/`).
 
 ## Commands and Workflows
@@ -133,7 +136,8 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - Data scripts (run with `npx tsx --env-file=.env.local`): `scripts/import-notes.ts <dir>`, `scripts/backfill-graph.ts`, `scripts/replay-layout.ts`.
 - Python skill tests: `python3 -B -m unittest discover -s tests/skills -v`.
 - CI (`.github/workflows/ci.yml`, Node 26): typecheck, tests, lint; per-OS native renderer tests under Electron, build, and standalone smoke. `release.yml` builds desktop releases. Actions are disabled on this fork.
-- Upstream intake: `git fetch origin && git merge --no-ff origin/main` on `dev`, only when the user asks.
+- Upstream intake: the `upstream` runnable reports waiting releases at onboard; merge with `git fetch origin && git merge --no-ff origin/main` on `dev`, only when the user asks, then reconcile `docs/architecture.md` (see `docs/fork-workflow.md`).
+- Daily app: change on `dev` → `mem promote production` → `npm run desktop:local`.
 
 ## External Interfaces
 - **HTTP API (`app/api`):** `chat` (POST turn); `chats` (list/create) and `chats/[id]` (read/rename/delete, `settings`, `steer`, `stream`, `dismiss`, `artifact-ui`, `markdown` export); `events` (SSE); `activity` + `activity/abort`; `jobs`; `graph` (snapshot, `status`, `costs`, `coverage/extract`, `import`, `nodes/[id]` DELETE, `positions`, `render-settings`); `keys`, `keys/[id]`; `models`; `search`; `settings`, `settings/[section]`, `settings/prompts`, `settings/prompts/[...segment]`; `stt/token`; `subscriptions`, `subscriptions/browser`.
@@ -161,4 +165,4 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - `globalThis`-backed registries for process-wide state (turn liveness, turn runs, extraction runs, semaphore, event bus) to survive Next's per-entry module instances.
 - Long comments carry dated owner rulings explaining decisions; match that style when editing nearby code.
 - Upstream `AGENTS.md` rule "No guessing": ask the user before any design or implementation decision.
-- `docs/architecture.md` is upstream's canonical spec but is stale in places: it still describes a practice pipeline (`PracticeStore`, `data/practice`, `/practice`), `server/pi/record-adapter.ts`, AI SDK `UIMessage` SSE with `addToolOutput`, Google CSE search and an extraction embedder, none of which exist in the code now.
+- `docs/architecture.md` describes this fork's code (project memory `architecture`): a change that alters what it describes updates it in the same commit, and upstream merges reconcile it. `docs/development.md` is upstream's and is stale in its Layout and Key mechanisms sections.
