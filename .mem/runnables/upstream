@@ -1,19 +1,68 @@
 #!/bin/sh
 # Keeps this fork's main an exact mirror of amosblomqvist/learnharness and reports how much of it
 # dev has not merged. main is never committed to: dev takes upstream in by merge commit ([git] base).
+# When dev is behind, it also prints each waiting upstream release with its notes and the risk areas
+# the waiting commits touch, so intake is a deliberate review rather than a blind merge.
 
 fork=Benjamin-van-Heerden/learnharness
+upstream_repo=amosblomqvist/learnharness
 
+has_gh=true
 if ! command -v gh >/dev/null 2>&1; then
+	has_gh=false
 	echo "⚠️ gh is not installed, so main was not synced from upstream. Sync it on GitHub (Sync fork) or install gh."
 elif ! out=$(gh repo sync "$fork" --branch main 2>&1); then
 	echo "⚠️ Could not fast-forward the fork's main from upstream: $(printf '%s' "$out" | head -n 1). If main has commits of its own it is no longer a mirror; tell the user."
 fi
 
 git fetch -q origin main 2>/dev/null
+git fetch -q upstream --tags 2>/dev/null
 latest=$(git log -1 --format='%h %s, %cr' origin/main 2>/dev/null)
 missing=$(git rev-list --count dev..origin/main 2>/dev/null || echo 0)
 echo "main mirrors upstream at $latest; dev lacks $missing of its commits."
-if [ "$missing" -gt 0 ]; then
-	echo "After merging them (only when the user asks; see the Base line), run \`npm install\` if package-lock.json changed, then \`npm test\`, and check docs/ and AGENTS.md below the mem block for upstream's changed conventions."
+[ "$missing" -gt 0 ] || exit 0
+
+tags=$(git tag --list 'v*' --merged origin/main --no-merged dev --sort=creatordate 2>/dev/null)
+if [ -n "$tags" ]; then
+	echo
+	echo "Upstream releases dev has not merged ($(printf '%s\n' "$tags" | wc -l | tr -d ' ')):"
+	for tag in $tags; do
+		echo
+		echo "=== $tag ($(git log -1 --format=%cs "$tag")) ==="
+		if [ "$has_gh" = true ] && notes=$(gh release view "$tag" --repo "$upstream_repo" --json body -q .body 2>/dev/null); then
+			printf '%s\n' "$notes" | head -n 60
+			if [ "$(printf '%s\n' "$notes" | wc -l)" -gt 60 ]; then
+				echo "… (truncated) https://github.com/$upstream_repo/releases/tag/$tag"
+			fi
+		else
+			echo "(no release notes available: no GitHub release for this tag, or gh is offline)"
+		fi
+	done
 fi
+
+changed=$(git diff --name-only dev...origin/main 2>/dev/null)
+risk() {
+	files=$(printf '%s\n' "$changed" | grep -E "$2")
+	[ -n "$files" ] || return 0
+	echo
+	echo "$1"
+	printf '%s\n' "$files" | head -n 15 | sed 's/^/  /'
+	[ "$(printf '%s\n' "$files" | wc -l)" -le 15 ] || echo "  … and more"
+}
+echo
+echo "Risk areas in the waiting commits ($(printf '%s\n' "$changed" | wc -l | tr -d ' ') files changed):"
+risk "Dependencies (npm install after merging):" '^package(-lock)?\.json$'
+risk "Desktop shell (rebuild and smoke the app):" '^(electron/|electron-builder\.yml$)'
+risk "On-disk formats (check existing data still reads):" '^(src/core/contracts/|src/store/|tests/fixtures/golden-data/)'
+risk "Architecture doc (reconcile with ours, it describes this fork):" '^docs/architecture\.md$'
+risk "Upstream agent rules (AGENTS.md below the mem block):" '^AGENTS\.md$'
+
+cat <<'EOF'
+
+AGENT INSTRUCTION (upstream intake): tell the user what upstream has waiting and summarise the release
+notes above, including anything that touches our own changes. Recommend reviewing before merging, and
+merge only when the user asks: `git fetch origin && git merge --no-ff origin/main` on dev, then `git push`.
+After a merge: run `npm install` if package-lock.json changed, `npm run typecheck`, and the tests related
+to the changed areas; reconcile docs/architecture.md with the merged code (it describes this fork). Then
+remind the user that the installed app only changes after `mem promote production` and `npm run desktop:local`.
+EOF
