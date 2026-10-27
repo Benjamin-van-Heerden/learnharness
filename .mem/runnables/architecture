@@ -1,0 +1,10 @@
+#!/bin/sh
+# Prints the outline of docs/architecture.md (this fork's canonical architecture spec) so each session
+# knows what it covers without reading all of it.
+
+doc=docs/architecture.md
+[ -f "$doc" ] || { echo "⚠️ $doc is missing."; exit 0; }
+
+echo "Outline of $doc (line: heading):"
+grep -n -E '^#{2,3} ' "$doc" | sed -E 's/^([0-9]+):(###? )/  \1: \2/'
+echo "Read the sections a change touches before making it, and update them in the same commit."

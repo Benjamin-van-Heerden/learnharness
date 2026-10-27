@@ -255,6 +255,9 @@ NEVER run a full test suite unless specifically asked to. focus on specific test
 
 <memories>
 # Project Memories
+
+## architecture
+docs/architecture.md describes THIS fork's code, not upstream's. When a change alters what it describes (layers, import zones, systems, stores, on-disk formats, runtime flows, invariants, seams), update the affected sections in the same commit. When merging upstream, reconcile upstream's edits to it against our code rather than taking either side wholesale.
 </memories>
 
 <!-- BEGIN:nextjs-agent-rules -->
