@@ -1,6 +1,6 @@
 # Learning Harness — Architecture
 
-Status: **the canonical architecture spec** — describes the as-built system, verified against the code by a full audit on 2026-09-18 (every file under `src/`, `app/`, `components/`, `electron/`, `scripts/`, the lint config, and the test suite; `lint` and `typecheck` clean on the audited tree). The pre-audit spec is archived at [`archive/architecture-2026-09-08.md`](archive/architecture-2026-09-08.md) — history only. Product reasoning lives in [`docs/vision.md`](vision.md); file-by-file layout lives in the README.
+Status: **the canonical architecture spec for this fork** — it describes the code in this repository, which takes upstream (amosblomqvist/learnharness) in by merge. Upstream's full audit (2026-09-18) established it; on 2026-10-27 it was brought back in line with the code (practice sessions, the pi-native message record and stream wire, the ports, the event vocabulary, search, the Electron channels), and it changes in the same commit as any change to what it describes. The pre-audit spec is archived at [`archive/architecture-2026-09-08.md`](archive/architecture-2026-09-08.md) — history only. Product reasoning lives in [`docs/vision.md`](vision.md); the file-by-file map lives in `.mem/structure.md`; the fork's build and upstream-intake loop in [`fork-workflow.md`](fork-workflow.md).
 
 **What this is.** A standalone learning app (web + Electron desktop): the learner's knowledge accumulates into one persistent, cross-session knowledge graph, built from tutoring sessions in which a teacher agent authors a formal, visible dependency tree (the plan tree) and verifies understanding with structured questions. The graph is the home page; the session is the classroom; everything else serves those two.
 
@@ -21,16 +21,15 @@ Hold the architecture along two orthogonal axes:
 
 **Static structure — the hexagon.** One pure core (`src/core`); everything else is an *adapter* (implements a core port or drives the core) or a *composition root* (the only code that wires adapters to core). Dependency arrows point **inward only** — toward purity, toward stability. Two barrels are the entire public API: `@/src/core` (browser-safe) and `@/src/server` (the server-side surface).
 
-**Runtime ownership — six systems.** Each persistent store has exactly one owning writer-system; systems talk only through named, idempotent protocols:
+**Runtime ownership — five systems.** Each persistent store has exactly one owning writer-system; systems talk only through named, idempotent protocols:
 
 | System | Owns (sole writer) | Role |
 |---|---|---|
-| **Classroom** — session engine | `data/chats/*.json` | the turn pipeline, prober→teacher, plan tree, questions, phases |
+| **Classroom** — session engine | `data/chats/*.json` | the turn pipeline, prober→teacher and practice sessions, plan tree, questions, phases, compaction |
 | **Workbench** — background labor | `data/jobs/*.json` | job runner, researcher/demo-builder/visual-maker, steer delivery |
 | **Library** — world model | `data/graph/*` ledgers | extraction pipeline (sole graph writer), derivation, birth-session clusters |
-| **Practice** — problem sets | `data/practice/*.json` | partitioner→generator→grader pipeline, self-contained sets (§7) |
 | **Stage** — presentation shell | nothing server-side | components/, graph canvas, docks — pure consumer via `/api/*` |
-| **Machine room** — host | process + config | Electron main, standalone Next server, `config.ts`, data-dir seam, BYOK keys |
+| **Machine room** — host | process + config | Electron main, standalone Next server, `config.ts`, data-dir seam, BYOK keys, subscription credentials |
 
 **The unifying law** (generates everything else): **imports point inward, writes point to append-only evidence, and everything else is derived.** Dependency flows toward purity; data flows toward evidence; no state is stored where it can be recomputed.
 
@@ -54,16 +53,16 @@ Dependency arrows point **down only**. Each layer may import the core barrel; no
 │            extraction pipeline. Deps arrive via factories —  │
 │            never imported from below                          │
 ├──────────────────────────────────────────────────────────────┤
-│ CORE       src/core        pure domain: contracts (6 domains),│
+│ CORE       src/core        pure domain: contracts (8 domains),│
 │            ports, merger + derivation, coverage, question-   │
 │            core, plan-tree, phases, layout, prices. No IO     │
-│            (two files use node:crypto — pure                  │
-│            but node-bound, hence kept out of the barrel)      │
+│            (node-bound files such as graph.ts stay out        │
+│            of the browser barrel — see §2.1)                  │
 ├──────────────────────────────────────────────────────────────┤
 │ STORE      src/store       fs adapters: chats · graph        │
-│            ledgers · jobs (implement core ports) + two       │
-│            portless settings adapters. The ONLY modules     │
-│            that touch data/                                   │
+│            ledgers · jobs · settings · prompts · auth        │
+│            (core ports) + portless render-settings. ONLY    │
+│            these modules touch data/                          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -79,32 +78,32 @@ Dependency arrows point **down only**. Each layer may import the core barrel; no
 ```mermaid
 flowchart TB
     subgraph SHELL["SHELL — render + transport, no domain logic"]
-        APP["app/ — pages + 28 API route handlers"]
+        APP["app/ — pages + 32 API route handlers"]
         COMP["components/ — session + home UI, graph canvas"]
     end
 
     subgraph SERVER["SERVER — src/server — composition + seams"]
         SBAR["barrel index.ts — THE server surface"]
         ROOTS["composition roots: stores.ts (storage) · chat-handler.ts (turn)"]
-        SEAMS["service seams: turn-service · jobs (wake) · turn-liveness · commit-positions · observability · model-catalog · settings-body"]
-        PIB["pi/ — engine bridge: record-adapter (record → pi messages) · ui-stream (pi events → SSE)"]
+        SEAMS["service seams: turn-service · jobs (wake) · turn-liveness · turn-runs · compaction · dismissal-park · events-stream · commit-positions · observability · model-catalog · settings-body · web-subscriptions"]
+        PIB["pi/ — ui-stream (pi agent events → SSE, reattach) · call-ids (tool-call id uniquifier)"]
     end
 
     subgraph AGENT["AGENT — src/agent — LLM loops, deps injected"]
-        TEACH["prober + teacher agents · tools · prompt fragments"]
-        SUBS["sub-agents: researcher · demo-builder · visual-maker"]
+        TEACH["prober + teacher + practice agents · tools · prompt fragments"]
+        SUBS["sub-agents: researcher · demo-builder · visual-maker · pdf-reader"]
         PIPE["extraction pipeline"]
     end
 
     subgraph CORE["CORE — src/core — pure domain, zero IO"]
-        CONTRACTS["contracts/ — 6 domains: plan · graph · chat · jobs · probe · models"]
-        PORTS["ports.ts — ChatStore · GraphStore · JobStore (types only)"]
-        BRAIN["merger + derivation · coverage · question-core · plan-tree · phases · layout · prices · tool-parts"]
+        CONTRACTS["contracts/ — 8 domains: plan · graph · chat · jobs · probe · models · chatgpt · subscriptions"]
+        PORTS["ports.ts — ChatStore · GraphStore · JobStore · SettingsStore · PromptOverrideStore · AuthStore (types only)"]
+        BRAIN["native-messages · input-events · merger + derivation · chains · coverage · question-core · plan-tree · phases · compaction · layout · prices · tool-parts"]
         CBAR["barrel index.ts — browser-safe exports ONLY"]
     end
 
     subgraph STORE["STORE — src/store — fs adapters, only data/ writers"]
-        ADP["chats.ts · graph.ts · jobs.ts (implement core ports)"]
+        ADP["chats.ts · graph.ts · jobs.ts · settings.ts · prompt-overrides.ts · auth.ts (implement core ports)"]
         PORTLESS["render-settings.ts (portless)"]
     end
 
@@ -136,60 +135,61 @@ flowchart TB
     COMP -.->|"✗ FORBIDDEN (lint)"| SERVER
 ```
 
-**Two rules are documentation-only by design.** The ESLint plugin's `except` can't express "all but one", so (a) `src/server/stores.ts` is *intended* to be the only server module importing adapters — but the server barrel also re-exports the two portless settings adapters and `observability.ts` imports `chatStore` directly; and (b) the browser-safety of the core barrel is a doc-comment convention (see §2.1). `tests/`, `scripts/`, and `electron/` are deliberately outside the law (lint-excluded); tests import freely across layers, scripts act as extra composition roots.
+**Two rules are documentation-only by design.** The ESLint plugin's `except` can't express "all but one", so (a) `src/server/stores.ts` is *intended* to be the only server module importing adapters — but the server barrel re-exports `render-settings`, `settings`, `promptOverrides` and `authStore`, and `keys.ts` (`authStore`), `model-catalog.ts` (`settingsStore`) and `observability.ts` (`chatStore`) import adapters directly; and (b) the browser-safety of the core barrel is a doc-comment convention (see §2.1). `tests/`, `scripts/`, and `electron/` are deliberately outside the law (lint-excluded); tests import freely across layers, scripts act as extra composition roots.
 
 ### 2.1 The core barrel and browser-safety
 
-`src/core/index.ts` exports only browser-safe modules — pure logic + types, no node builtins, no fs, no network. Deliberately **not** barrel-exported (server code imports them directly): `graph.ts` and `coverage.ts` (need `node:crypto`), `clusters.ts`, `session-clusters.ts` and `layout-settle.ts` (server-only roles). Port *types* are types-only, hence safe to re-export. This split is what lets the same core serve browser (grading, layout, plan statuses, cost folding) and server (merger, derivation, coverage).
+`src/core/index.ts` exports only browser-safe modules — pure logic + types, no node builtins, no fs, no network. Deliberately **not** barrel-exported (server code imports them directly): `graph.ts` (needs `node:crypto`), `clusters.ts`, `session-clusters.ts` and `layout-settle.ts` (server-only roles). One exception holds today: `coverage.ts` imports `node:crypto` yet is barrel-exported. Port *types* are types-only, hence safe to re-export. This split is what lets the same core serve browser (grading, layout, plan statuses, cost folding) and server (merger, derivation, coverage).
 
 ### 2.2 Contracts — one file per domain
 
-`src/core/contracts.ts` is a barrel over seven domain files, each owned outright by its stream (schema changes in a domain you don't own go through the master session):
+`src/core/contracts/` holds eight domain files. `src/core/contracts.ts` re-exports six of them; `chatgpt.ts` and `subscriptions.ts` reach the core barrel (`src/core/index.ts`) directly:
 
 - `contracts/plan.ts` — plan tree types + derived statuses (`derivePlanStatuses`)
 - `contracts/graph.ts` — graph domain: ledgers, findings/audit shapes, snapshot, birth-session clusters
-- `contracts/chat.ts` — session records, usage/money channel, settings, handoff text
+- `contracts/chat.ts` — session records (incl. `ChatKind`: `teach` | `practice`), usage/money channel, settings, handoff text
 - `contracts/jobs.ts` — the ack-and-steer protocol: job records, steer message builders, deterministic steer ids, usage accumulation
 - `contracts/probe.ts` — probe assessment + the shared zod schema
 - `contracts/models.ts` — client-safe model-catalog shapes
-- `contracts/practice.ts` — problem sets, reasoning chains, params, grade scores
+- `contracts/chatgpt.ts` — ChatGPT connection status and control-bridge shapes
+- `contracts/subscriptions.ts` — native subscriptions (GitHub Copilot, xAI): ids, status, scopes, prompts
 
 ---
 
 ## 3. Ports, adapters, and the composition roots
 
-Storage is **per-entity semantic ports**, never one generic interface: `ChatStore`, `GraphStore`, `JobStore`, `PracticeStore` (`src/core/ports.ts` — types only). The fs adapters (`src/store/{chats,graph,jobs,practice}.ts`) implement them and contain persistence and nothing else. One more adapter (`src/store/render-settings.ts`) is a portless free function re-exported through the server barrel — a deliberate pragmatic bypass, documented here so nobody mistakes it for the pattern.
+Storage is **per-entity semantic ports**, never one generic interface: `ChatStore`, `GraphStore`, `JobStore`, `SettingsStore`, `PromptOverrideStore`, `AuthStore` (`src/core/ports.ts` — types only). The fs adapters (`src/store/{chats,graph,jobs,settings,prompt-overrides,auth}.ts`, plus `graph-format.ts` for the graph family's version stamp) implement them and contain persistence and nothing else. One more adapter (`src/store/render-settings.ts`) is a portless free function re-exported through the server barrel — a deliberate pragmatic bypass, documented here so nobody mistakes it for the pattern.
 
 **Idioms.** Graph evidence lives in **append-only JSONL ledgers** (corrupt-line-tolerant reads; strict shape guards drop invalid lines, never guess). Chats, jobs, positions, sources, and the settings blobs are whole-file read-modify-write JSON. All writes are synchronous, single-process (atomicity rides the Node event loop). Merge/dedup/derivation semantics are **reader-side, in core** — the store never decides.
 
-- **`src/server/stores.ts` is THE composition root for storage**: it instantiates the adapters and hands the port objects to everything else (chat-handler, job runner, extraction pipeline, practice pipeline, graph/positions/chats routes, turn services). It is the single place a storage decision (JSON vs SQLite, local vs remote) gets re-made.
-- **`src/server/chat-handler.ts` is THE composition root for a turn**: it wires the stores, the job runner, the extraction pipeline, the practice pipeline, and the pi engine into the stream response (`setTurnRunner`/`setJobRespawn` register its seams for the wake pipeline). All logic lives behind the seams it calls.
-- The agent layer is dependency-inverted throughout: `createJobRunner({ chatStore, jobStore, deliver })`, `createExtractionPipeline({ chatStore, graphStore, extractor?, auditor?, embedder })`, `createTeacherTools({ chatId, chatStore, jobStore, spawn })`, `createProberAgent`/`createTeacherAgent(engine?, tools?, …)`. Tests inject the same ports production wires — or swap an in-memory port.
+- **`src/server/stores.ts` is THE composition root for storage**: it wires `{chatStore, graphStore, jobStore, settingsStore}` and hands the port objects to everything else (chat-handler, job runner, extraction pipeline, graph/positions/chats routes, turn services), plus `effectiveSettings()`. It is the single place a storage decision (JSON vs SQLite, local vs remote) gets re-made.
+- **`src/server/chat-handler.ts` is THE composition root for a turn**: it wires the stores, the job runner, the extraction pipeline, and the pi engine into the stream response (`setTurnRunner`/`setJobRespawn` register its seams for the wake pipeline). All logic lives behind the seams it calls.
+- The agent layer is dependency-inverted throughout: `createJobRunner({ chatStore, jobStore, deliver, engineFor })`, `createExtractionPipeline({ chatStore, graphStore, engineFor, extractor?, auditor?, getChunkTokens? })`, `createTeacherTools({ chatId, chatStore, jobStore, spawn, searchAvailable })`, `createProberAgent`/`createTeacherAgent`/`createPracticeAgent(ctx, opts)`. Tests inject the same ports production wires — or swap an in-memory port.
 
-The engine side is adapted too: `src/agent/models.ts` (`piEngineFor`) resolves each role's engine from the user's **model slots** (BYOK: `settings.json` `models` section — strong/cheap/vision; a chain that ends empty refuses honestly with 503 `models_not_configured`) — and the teacher/prober conversation runs the **SESSION'S OWN record**: `POST /api/chats` stamps every newborn verbatim from the strong slot (the new-session default, chosen in setup), in-session picks write the session's record (`PUT /api/chats/:id/settings`), and the strong slot never reaches an existing session again (legacy unstamped records fall back to it at resolve time) — per-session models, owner 2026-09-28. Beyond the conversation, `src/server/pi/` bridges the two SDK worlds: `record-adapter.ts` (persisted UIMessage record → stateless pi `Message[]`, dangling tool calls get synthesized INTERRUPTED results) and `ui-stream.ts` (pi agent events → AI-SDK UIMessage SSE).
+The engine side is adapted too: `src/agent/models.ts` (`piEngineFor`, `piEngineForSpec`) resolves each role's engine from the user's **model slots** (BYOK: `settings.json` `models` section — strong/cheap/vision; a chain that ends empty refuses honestly with 503 `models_not_configured`) — and the teacher/prober conversation runs the **SESSION'S OWN record**: `POST /api/chats` stamps every newborn verbatim from the strong slot (the new-session default, chosen in setup), in-session picks write the session's record (`PUT /api/chats/:id/settings`), and the strong slot never reaches an existing session again (legacy unstamped records fall back to it at resolve time) — per-session models, owner 2026-09-28. Records are pi-native: a chat record stores `LhMessage`s (`src/core/native-messages.ts` — pi's user/assistant/toolResult messages plus `role: "custom"` markers such as `probe-handoff`, `plan-block`, `graph-context`, `subagent-steer`, `subagent-abort`, `compaction` and the practice markers), so replay is `asAgentMessages(record.messages)` with no translation; dangling tool calls (an aborted turn) get synthesized interrupted results (`INTERRUPTED_TEXT`). `src/server/pi/ui-stream.ts` (`runPiTurn`) streams the turn's own pi `AgentEvent`s as SSE to every view (the native wire), and `call-ids.ts` uniquifies tool-call ids for providers that reuse them.
 
 ```mermaid
 flowchart LR
     subgraph DRIVING["DRIVING ADAPTERS — inbound"]
-        BROWSER["Browser UI — components/: question dock (addToolOutput) · graph canvas · docks"]
-        HTTP["HTTP transport — app/api/*: 28 route handlers"]
+        BROWSER["Browser UI — components/: question + practice docks (answers as input events) · graph canvas · docks"]
+        HTTP["HTTP transport — app/api/*: 32 route handlers"]
         NOTES["Notes front door — POST /api/graph/import"]
         ELEC["Electron main — thin launcher, spawns server, LH_DATA_DIR + BYOK env"]
     end
 
     subgraph HEXCORE["THE CORE — src/core (pure domain)"]
         direction TB
-        SESS["session brain: phases · plan-tree · question-core · pending · steer builders"]
+        SESS["session brain: native-messages · input-events · phases · plan-tree · question-core · pending · steer builders"]
         GBRAIN["graph brain: merger + derivation · coverage · clusters · layout"]
-        PORTSBOX["PORTS (types only): ChatStore · GraphStore · JobStore · PracticeStore"]
+        PORTSBOX["PORTS (types only): ChatStore · GraphStore · JobStore · SettingsStore · PromptOverrideStore · AuthStore"]
     end
 
     subgraph DRIVEN["DRIVEN ADAPTERS — outbound"]
         FS["fs stores — src/store (data/)"]
-        LLM["LLM engines — pi-ai/OpenRouter via piEngineFor"]
-        HEAD["headless Chrome — demo verify · SVG render"]
+        LLM["LLM engines — pi-ai providers (API keys or subscription connections) via piEngineFor / piEngineForSpec"]
+        HEAD["browser service or system Chrome — demo verify · native resvg / pdfjs render"]
         DEEP["Deepgram STT — token-minting route, browser-side WebSocket"]
-        WEB["web tools — Google CSE + Readability/Jina (researcher)"]
+        WEB["web tools — Tavily/Brave search + Readability/Jina fetch (researcher)"]
     end
 
     BROWSER --> HTTP
@@ -209,7 +209,7 @@ flowchart LR
 
 ---
 
-## 4. The six systems (runtime ownership and protocols)
+## 4. The five systems (runtime ownership and protocols)
 
 The systems view: each box owns its store; edges are the protocols, each with the adapter/seam that implements it.
 
@@ -223,7 +223,7 @@ flowchart TB
 
     subgraph CLASSROOM["CLASSROOM — session engine (owns data/chats)"]
         TURN["turn pipeline — handleChatRequest"]
-        AGENTS["prober → teacher (stateless per-turn, from the record)"]
+        AGENTS["prober → teacher, or practice (stateless per-turn, from the record)"]
         CHATDATA["chat records — data/chats/*.json"]
     end
 
@@ -231,11 +231,6 @@ flowchart TB
         JOBRUN["job runner"]
         SUBAGENTS["researcher · demo-builder · visual-maker"]
         WAKE["wake pipeline — per-chat serialized queues on globalThis"]
-    end
-
-    subgraph PRAC["PRACTICE — problem sets (owns data/practice)"]
-        PPART["practice pipeline — partitioner → one generator per problem · one grader per answer<br/>(score-only; never steers the teacher)"]
-        PDATA["problem sets — data/practice/*.json"]
     end
 
     subgraph LIBRARY["LIBRARY — world model (owns data/graph ledgers)"]
@@ -249,7 +244,7 @@ flowchart TB
     end
 
     LEARNER -->|"text · answers [transport adapter]"| UI
-    UI -->|"POST /api/chat [question answers ride addToolOutput]"| TURN
+    UI -->|"POST /api/chat [answers ride as input events]"| TURN
     TURN -->|"quiz / ask_user_question stream to browser [client-question tools, no execute]"| UI
     TURN -->|"saveMessages · persistTurn [ChatStore port]"| CHATDATA
     TURN -->|"spawn(job) — fire-and-forget ack [job tools + JobStore port]"| JOBRUN
@@ -260,53 +255,53 @@ flowchart TB
     EXTRACT -->|"reads transcript as evidence [ChatStore port]"| CHATDATA
     EXTRACT -->|"append-only ledger writes [GraphStore port — sole writer]"| GRAPHDATA
     DERIVE -->|"pure read: snapshot for home [graphSnapshot]"| GRAPHDATA
-    UI -->|"POST /api/practice/sets · answers [HTTP transport]"| PPART
-    PPART -->|"reads the graph ONCE at creation — propositions+chains frozen into the set [GraphStore port, pure read]"| GRAPHDATA
-    PPART --> PDATA
+    UI -->|"POST /api/chats with picks — picks + their chains frozen into a graph-context marker [GraphStore port, pure read]"| GRAPHDATA
     UI -->|"GET /api/graph (read) · PUT positions (sanctioned exception) · POST import"| DERIVE
     HOST -.->|"hosts every server-side system"| TURN
 ```
 
-Four server-side systems, each the sole writer of its own store, connected by named protocols: the **turn request** (Stage→Classroom), the **ack-and-steer** loop (Classroom→Workbench→Classroom), the **extraction trigger + transcript read** (Classroom→Library), and the **practice request** (Stage→Practice over HTTP, plus Practice's one-time graph snapshot read at creation). The Stage touches systems only through the thin HTTP transport; the teacher reaches the Library directly through the gated prober tools (`list_sessions` / `list_propositions`) rather than any injected context.
+Three server-side systems, each the sole writer of its own store, connected by named protocols: the **turn request** (Stage→Classroom), the **ack-and-steer** loop (Classroom→Workbench→Classroom), and the **extraction trigger + transcript read** (Classroom→Library; practice sessions never trigger it). Session creation reads the Library once when the learner picks propositions: `POST /api/chats` with `graphContext` freezes the picks, and the stored chains among them (`chainsForSelection`), into a `graph-context` marker as the record's first message. The Stage touches systems only through the thin HTTP transport; the prober and the practice agent reach the Library directly through the gated graph tools (`list_sessions` / `list_propositions`) rather than any injected context.
 
 ---
 
 ## 5. The session (one chat turn)
 
-`handleChatRequest` is framework-free (plain `Request`/`Response`) with a `buildAgent` test seam so tests drive it with scripted engines. The turn, in exact order:
+`handleChatRequest` is framework-free (plain `Request`/`Response`) with a `buildAgent` test seam so tests drive it with scripted engines. It parses `{chatId, input}` (`parseChatInput`, `core/input-events.ts`: text, answer, continue, practice thinking/next, dismissals; the wake pipeline's steers enter `handleChatInput` directly). The turn, in exact order:
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser (useChat)
+    participant B as Browser (session view)
     participant R as POST /api/chat
-    participant H as handleChatRequest
-    participant L as turn-liveness (globalThis)
+    participant H as handleChatInput
+    participant L as turn-liveness / turn-runs (globalThis)
     participant CS as chatStore adapter
-    participant A as prober/teacher agent (pi engine)
-    participant F as onFinish seams
+    participant A as prober / teacher / practice agent (pi engine)
+    participant F as settle seams
 
-    B->>R: messages (+ graded question output via addToolOutput)
-    R->>H: handleChatRequest(req)
+    B->>R: {chatId, input} (text · answer · continue · ...)
+    R->>H: parseChatInput → handleChatInput
+    H->>H: model gate + provider-key gate (503 envelopes, nothing changes)
+    H->>H: ensureCompacted (waits for, or runs, compaction)
+    Note over H: an answer while another question is still open:<br/>save + settled terminal, no turn
     H->>L: beginTurn(chatId)
-    Note over H,L: already running → 409; retryingFetch waits, re-fetches<br/>the record, merges unsent client messages by id, re-POSTs
-    H->>H: claimSteers — coalesce queued steers into outgoing
-    H->>CS: saveMessages (write-ahead: persist even before the stream)
-    H->>A: build agent from record (probe_done part in transcript ⇒ teacher)
-    Note over H,A: recordToPiMessages: stateless rebuild; dangling<br/>tool calls get synthesized INTERRUPTED results
-    A-->>B: SSE stream (ui-stream bridge)
-    Note over B: quiz / ask_user_question have NO server execute:<br/>rendered in the dock; graded client-side via question-core
-    B->>B: QuestionDock: parse → shuffle (seeded) → buildAnswer (grade)
-    B->>R: continuation (sendAutomaticallyWhen fires)
-    A-->>F: onFinish
+    Note over H,L: already running → 409; the client backs off and retries
+    H->>CS: saveMessages (write-ahead: input persists before any agent runs)
+    H->>A: build from the record: practice kind ⇒ practice agent;<br/>probe_done in transcript ⇒ teacher; else prober
+    Note over H,A: asAgentMessages(record) — pi-native replay
+    A-->>B: runPiTurn: pi AgentEvents as SSE (registerTurn: other views reattach via GET /api/chats/[id]/stream)
+    Note over B: quiz / ask_user_question / problem are answered in the docks;<br/>quiz answers graded client-side via question-core
+    A-->>F: settle
     F->>CS: persistTurn (canonical, idempotent) + appendTurnUsage
-    F->>F: triggerExtraction — if uncovered tokens ≥ chunkTokens, fire async
-    F->>L: endTurn (ALWAYS last — the registry never locks)
+    F->>F: triggerExtraction — teach sessions, if uncovered tokens ≥ chunkTokens
+    F->>F: applyParkedDismissal
+    F->>L: endTurn + unregisterTurn
+    F->>F: kickCompaction (background, for the next turn)
 ```
 
-- **Client-side question tools** (`quiz`, `ask_user_question`) have no server execute: the call streams to the browser, the learner answers in the dock, the client grades via `question-core` and returns the verdict with `addToolOutput`, which fires the continuation. A pending quiz persisted in the record is exactly what makes **resume mid-question free**. Deterministic seeded shuffling (keyed by toolCallId) keeps server and client renders identical.
-- **The prober→teacher handoff**: the first turn(s) run the prober (floor/ceiling via quiz, goal via ask); `probe_done` (server-executed) files the assessment and queues a handoff steer; from the first `tool-probe_done` part in the transcript, the handler builds the teacher agent for every later turn. Phases (`core/phases.ts`) fold strictly: probe → plan → teach.
+- **Question tools** (`quiz` or `explain`, `probe` or `recall`, `ask_user_question`) have no server execute: the call streams to the browser, the learner answers in the dock, and the answer arrives as the next input event (`{type: "answer", toolCallId, answer}`); quiz answers are graded client-side via `question-core` (`buildAnswer`). A pending question persisted in the record is exactly what makes **resume mid-question free**. Deterministic seeded shuffling (keyed by toolCallId) keeps server and client renders identical. ESC dismissal posts to `/api/chats/[id]/dismiss`, which writes silently or parks the dismissal for the running turn (`dismissal-park.ts`).
+- **The prober→teacher handoff**: the first turn(s) run the prober (floor/ceiling via probe, goal via ask); `probe_done` (server-executed) files the assessment and queues the handoff steer (`buildProbeHandoffSteer`, saved as a `probe-handoff` marker); once `hasProbeDone(record.messages)`, the handler builds the teacher agent for every later turn. Phases (`core/phases.ts`) fold strictly: probe → plan → teach. Practice sessions skip this: they run the practice agent from the first turn (§7).
 - **The formal plan tree is author-once**: the teacher authors the session's dependency map with a single schema-validated `plan_init` tool (a mermaid-subset graph, parsed deterministically with line-numbered errors, validated as a DAG). Progress is never mutated — statuses (`current`/`visited`/upcoming) are **derived** from tagged quiz calls in the transcript; the tree panel and the plan blocks render that derivation.
-- **Job tools are server-executed, ack-and-steer**: `research`/`demo`/`visual` resolve immediately mid-turn with a fire-and-forget ack (the teacher keeps teaching); `spawn(job, input)` fires the background runner.
+- **Job tools are server-executed, ack-and-steer**: `research`/`demo`/`visual`/`pdf` resolve immediately mid-turn with a fire-and-forget ack (the teacher keeps teaching); `spawn(job, input)` fires the background runner. The prober and the practice agent carry the `research` and `pdf` subset. `send_to_user` is added for Claude models only (`teacher-agent.ts`).
 - Turn services are named seams taking explicit dependencies. Extraction contains its errors, but **canonical persistence must not fail silently**: a failed input write refuses acceptance without starting an agent; `persistTurn` throws on a failed reply write. The runner reports settlement failure before `[DONE]` and releases liveness even when normal settlement fails. Steer reconciliation uses the durable record, so a later bookkeeping failure cannot replay already-saved learner input.
 - **Late attachment must still see settlement failure.** A small, memory-only notice per session precedes the settled stream terminal when the failing turn has already left the live registry. The next accepted turn, successful session deletion, or server exit clears it. Reopening seeds the existing banner from that notice and waits for ordinary learner input; dismissing the banner is not permission to automatically retry the model. No synthetic failure entry is added to the saved transcript.
 - **Recovery never blindly resends an answer.** Submitted question drafts survive optimistic unmount in memory; the existing Submit action reconciles uncertain acceptance against the canonical record and running-turn state before sending again. EOF or a rejected stream read without a terminal triggers one read-only reattachment; another transport failure shows the existing error banner rather than claiming completion. Explicit completion, cancellation, and the literal-final-entry saved-error rule remain unchanged.
@@ -336,7 +331,7 @@ The per-chat registry retains ownership across live handoff, idle-wake flight, a
 
 Recovery reads saved job input before legacy transcript lookup. Missing research questions fail honestly without invoking the researcher. Legacy running jobs with saved results become finished workers with pending delivery; legacy terminal jobs without delivery metadata remain untouched, rather than guessing that old outcomes should be replayed. Pending result and abort notices are restored before a newly registered agent's first steering poll, even without a preceding jobs-feed read. Deleting a session discards its pending delivery obligations; only live turns and computing workers block deletion. These guarantees use the existing JSON storage and single-process delivery registry, not a transactional queue or a promise of exactly-once model execution.
 
-Sub-agents **verify, never one-shot**: the demo-builder headlessly executes its HTML in system Chrome before delivery; the visual-maker renders each SVG and looks at it (needs a vision-capable model — the `vision` slot in settings).
+Sub-agents **verify, never one-shot**: the demo-builder executes its HTML in the app's browser service (system Chrome fallback) before delivery; the visual-maker renders each SVG and looks at it (needs a vision-capable model — the `vision` slot in settings).
 
 ---
 
@@ -356,7 +351,7 @@ flowchart TB
     MERGE -->|"failure at ANY stage"| NOTHING["checkpoints nothing — the next trigger re-runs"]
 ```
 
-**Raw reasoning chains only** (2026-09-27 cleanup; teacher-prose view 2026-09-28): the extractor reads ONLY the session — and since the 2026-09-28 ruling, ONLY the teacher agent's prose: plain paragraphs under the session title, no learner messages, no thinking, no tool calls or results, no quiz blocks. Coverage fingerprints, slot tokens, and batch budgets all derive from that same selection (`messageViewLines` in `core/coverage.ts`), so "covered" is exactly "what the extractor saw" — a quiz answer or learner edit can never open a run, and only a teacher-prose edit re-opens its message. The old call+result inseparability bond is deleted (nothing left to keep together); batching is pure greedy fill. The shared markdown engine (`core/session-markdown.ts`) keeps the full session format for the future user-facing export and is no longer used by extraction. The extractor's deliverable is propositions + REASONING CHAINS (owner redesign, 2026-09-30): a chain is premises that JOINTLY entail a conclusion — independent arguments for the same conclusion are separate chains, conclusions are reusable by id as premises, and a bare proposition rides the propositions list alone. The wire schema carries propositions (id/name/statement/optional aliases) + chains (premises minItems 1/conclusion) — and since the chains-primary ruling (2026-09-30) the STORE carries exactly that wire shape: chains append as-is to `chains.jsonl` (`SessionFindings` IS the store shape now; `chainsToEdges` and `chainsToGraph` are deleted — no translation seam exists). **Supports edges are retired entirely** (owner, same evening): `EdgeType`, the supports draw toggle and thickness slider, and every supports code path are gone — a stored typed edge no longer exists anywhere, and every arrow on the canvas is derived from a chain. No migration, no backcompat: the pre-chains graph data was wiped by ruling. The chain laws are enforced by the practice-proven error-back hook at the submit seam: every premise/conclusion id must resolve to a submitted proposition, premises are non-empty, no self-reference — a violation returns an error string and the model re-submits within its turns. The prompt is GOAL-FIRST, no rule armor (owner philosophy ruling, 2026-09-30): one shared `EXTRACTION_CORE` (the goal, the truth law, the submission mechanics) plus two one-sentence contextualizations — session and notes preambles — assembled at the call sites, so both front doors share the core by construction; the old defensive lists (DROP lists, merge-your-own-output, name walls, when-in-doubt-omit, the faithfulness paragraph) are all cut, and the old opening describing Quiz/Recall-check/Question blocks (stale since the teacher-prose ruling) is simply omitted. A `prepareArguments` heal at the pre-validation seam rescues stringified-payload submits (propositions or chains). Every node is an objective, world-facing fact. No quiz outcomes, no understanding assessments — the events ledger and `UnderstandingLevel` are deleted; the learner's relationship to a proposition is practice territory — which landed 2026-09-29 as **feedback-only strengthening** (§7): grades live on problem sets, and nothing ever writes learner states back to the graph.
+**Raw reasoning chains only** (2026-09-27 cleanup; teacher-prose view 2026-09-28): the extractor reads ONLY the session — and since the 2026-09-28 ruling, ONLY the teacher agent's prose: plain paragraphs under the session title, no learner messages, no thinking, no tool calls or results, no quiz blocks. Coverage fingerprints, slot tokens, and batch budgets all derive from that same selection (`messageViewLines` in `core/coverage.ts`), so "covered" is exactly "what the extractor saw" — a quiz answer or learner edit can never open a run, and only a teacher-prose edit re-opens its message. The old call+result inseparability bond is deleted (nothing left to keep together); batching is pure greedy fill. The shared markdown engine (`core/session-markdown.ts`) keeps the full session format for the future user-facing export and is no longer used by extraction. The extractor's deliverable is propositions + REASONING CHAINS (owner redesign, 2026-09-30): a chain is premises that JOINTLY entail a conclusion — independent arguments for the same conclusion are separate chains, conclusions are reusable by id as premises, and a bare proposition rides the propositions list alone. The wire schema carries propositions (id/name/statement/optional aliases) + chains (premises minItems 1/conclusion) — and since the chains-primary ruling (2026-09-30) the STORE carries exactly that wire shape: chains append as-is to `chains.jsonl` (`SessionFindings` IS the store shape now; `chainsToEdges` and `chainsToGraph` are deleted — no translation seam exists). **Supports edges are retired entirely** (owner, same evening): `EdgeType`, the supports draw toggle and thickness slider, and every supports code path are gone — a stored typed edge no longer exists anywhere, and every arrow on the canvas is derived from a chain. No migration, no backcompat: the pre-chains graph data was wiped by ruling. The chain laws are enforced by the practice-proven error-back hook at the submit seam: every premise/conclusion id must resolve to a submitted proposition, premises are non-empty, no self-reference — a violation returns an error string and the model re-submits within its turns. The prompt is GOAL-FIRST, no rule armor (owner philosophy ruling, 2026-09-30): one shared `EXTRACTION_CORE` (the goal, the truth law, the submission mechanics) plus two one-sentence contextualizations — session and notes preambles — assembled at the call sites, so both front doors share the core by construction; the old defensive lists (DROP lists, merge-your-own-output, name walls, when-in-doubt-omit, the faithfulness paragraph) are all cut, and the old opening describing Quiz/Recall-check/Question blocks (stale since the teacher-prose ruling) is simply omitted. A `prepareArguments` heal at the pre-validation seam rescues stringified-payload submits (propositions or chains). Every node is an objective, world-facing fact. No quiz outcomes, no understanding assessments — the events ledger and `UnderstandingLevel` are deleted; the learner's relationship to a proposition is practice territory (§7): practice sessions record their outcomes in their own chat records, and nothing ever writes learner states back to the graph.
 
 **Digest-aware serialized extraction — the extractor is the assembler** (owner redesign, 2026-09-30 evening): the spine stage came and went in one day — the owner's live test showed the post-hoc assembly pass added complexity without perceptible gain, because the real problems (restatement nodes, shallow re-derivations) are mint-time issues. The replacement moves assembly INTO the extractor: when a source already yielded material, each stretch's extractor prompt carries **THE GRAPH SO FAR** (that source's merged propositions and chains, ids verbatim), and the extractor builds on it — referencing existing ids instead of restating them, leaning on established conclusions as premises. Chains may therefore span stretches: endpoints are a mixed namespace of fresh local ids OR existing `n_` ids (validated at the submit seam, error-back; the merger's job-local map passes existing ids through verbatim). The system prompt reframes the goal as uncovering the source's **core ideas** and showing how everything **derives from the foundations** — direction upward, prefer lean derivations, never re-derive what the graph already holds. Because each stretch must read every earlier merge, a source's batches/chunks run **STRICTLY IN ORDER** (serialized per source); cross-source runs stay parallel. The first stretch of a source runs bare (no digest, no extra spend).
 
@@ -368,37 +363,36 @@ flowchart TB
 
 **Coverage, not quiz-counting** (supersedes the v1 every-N-quiz-answers trigger): each message's *view* (the compact line format `core/coverage.ts` has always hashed) is hashed into a per-chat fingerprint ledger (`coverage.jsonl`); "covered" means exactly "a run committed on this content." The prompt view is the richer markdown document — a deliberate 2026-09-27 split: re-formatting presentation never re-opens covered history. Uncovered = fingerprint diff, never dual-tracked; runs are greedy token-budgeted batches (`graph.extractionChunkTokens` — a settings knob, default 8192 since the digest-aware redesign doubled it 2026-09-30, floor 500, read fresh each turn) of the oldest uncovered messages — quiz-less sessions extract too. A coarse `sessions.jsonl` checkpoint still marks each merged run. The trigger seam (`turn-service.ts`) is trigger-agnostic from the pipeline's side: when a better mechanism lands (session end, idle, explicit flush), only the seam changes. Single-flight per source; the run registry powers the coverage UI and true abort.
 
-**Two front doors, one pipeline**: chat transcripts (quiz-triggered) and raw personal notes (`POST /api/graph/import` — each file becomes a `NotesSource` playing the `chatId` role, deterministic id from the path hash; a content-fingerprint stamp makes an unchanged re-import a TRUE no-op — no model calls, no usage — while changed text re-runs the whole file, owner 2026-09-29). Notes chunk like chats (owner, 2026-09-28): large files split at line boundaries under the same token budget, and each chunk runs as its own job exactly like a chat batch — serial per source (digest order), serialized audits under the gate. No single model call carries a whole file. Both submit tools require their top-level fields (`chains`/`links` present even when empty): a payload missing them fails validation rather than silently merging structure-less nodes.
+**Two front doors, one pipeline**: chat transcripts (coverage-triggered, teach sessions only) and raw personal notes (`POST /api/graph/import` — each file becomes a `NotesSource` playing the `chatId` role, deterministic id from the path hash; a content-fingerprint stamp makes an unchanged re-import a TRUE no-op — no model calls, no usage — while changed text re-runs the whole file, owner 2026-09-29). Notes chunk like chats (owner, 2026-09-28): large files split at line boundaries under the same token budget, and each chunk runs as its own job exactly like a chat batch — serial per source (digest order), serialized audits under the gate. No single model call carries a whole file. Both submit tools require their top-level fields (`chains`/`links` present even when empty): a payload missing them fails validation rather than silently merging structure-less nodes.
 
 **The read channel is pure derivation.** `GET /api/graph` reads the ledgers — the home view never triggers a write. **Chains-primary (owner ruling, 2026-09-30): the stored truth is propositions (`nodes.jsonl`) + reasoning chains (`chains.jsonl`); the canvas renders a LOSSY DERIVED IMAGE of what is truly stored.** `graphSnapshot` merges the ledgers, then `deriveView` (core/graph.ts) rebuilds the view on every read: each stored chain mints an IMPLICATION NODE (id = the chain's `arg_` id, name `⟹`, statement = the chain line) plus untyped arrows premise→implication→conclusion; dangling chains (a member node since deleted) drop. This is the BIJECTION the edge store could not hold: two independent arguments for one conclusion (`A∧B⇒E`, `C∧D⇒E`) render as two distinct diamonds instead of a manufactured `A∧B∧C∧D⇒E` fan-in — one stored argument, one visual argument. Implication nodes are regular physics citizens for now (rendering specialization is deliberately future work). Clusters are the BIRTH-SESSION partition over propositions only (`birthSessionPartition`, core/session-clusters.ts — session provenance; no Louvain anywhere, whatever old comments claimed) — implication nodes are never partitioned and ride the physics unclustered. Node detail cards show name + proposition + birth sessions; the edge lists died with typed edges (owner, 2026-09-30).
 
 **Deletion is full death, cascade-aware.** Deleting a proposition kills EVERY stored chain that references it, premise or conclusion — the derived implication node vanishes with the last of them, and positions are pruned. Deleting an implication node (any `arg_`-prefixed id — the canvas treats them as deletable nodes) deletes exactly that ONE stored argument and nothing else. Same minimal confirm dialog from the canvas right-click and the chain table's fenced Delete.
 
-**The teacher probes, nothing is injected** (supersedes the semantic-injection experiment, killed 2026-09-23): the teacher reaches the graph on its own terms through two read-only prober tools — `list_sessions` (birth sessions, the learner's files) and `list_propositions` (the names of what a session covered) — gated by the `agent.graphTools` setting (composing with `graph.enabled`). No topic embedding, no top-K selection, no session-start steer; the agent decides what to look at, and the graph never writes into a lesson unbidden.
+**The teacher probes, nothing is injected** (supersedes the semantic-injection experiment, killed 2026-09-23): the teacher reaches the graph on its own terms through two read-only prober tools — `list_sessions` (birth sessions, the learner's files) and `list_propositions` (the names of what a session covered) — gated by the `agent.graphTools` setting (composing with `graph.enabled`; `graphToolsEnabled`). The prober and the practice agent carry them. No topic embedding, no top-K selection, no session-start steer; the agent decides what to look at, and the graph never writes into a lesson unbidden.
 
 **Rendering**: a hand-rolled Canvas 2D renderer (`components/graph-canvas.ts` — one rAF loop, dirty-flag idle, d3-zoom camera, zoom-gated label fade, cluster hulls computed at draw time) over a d3-force layout in core (`layout.ts`, warm-started `incrementalLayout` + `settleGraphLayout`). Render settings and drag-committed positions persist server-side; the camera persists per-device in localStorage.
 
 ---
 
-## 7. Practice — strengthening, not assessment (owner ruling 2026-09-29)
+## 7. Practice — a session kind (owner design 2026-10-04)
 
-Practice turns the graph into problem sets the learner reasons through out loud. The purpose ruling first: this is **strengthening, not assessment**. Grades are feedback for the learner — a score, a brief justification, a look at the model solution — and nothing else. Grading writes nothing to the graph, no understanding levels exist anywhere, and the vision doc's exam machinery (scores, streaks, spaced repetition over failure rates) stays parked. A set exercises what the learner already met; it certifies nothing.
+Practice is strengthening, not assessment: nothing a practice session does reaches the graph, no understanding levels exist anywhere, and outcomes stay in the session's own record.
 
-**The chain model.** Practice reads the STORED chains directly (chains-primary, 2026-09-30): `chainsForSelection` (`src/core/practice.ts`) includes a stored argument iff its conclusion AND every premise are selected — an argument missing any member is excluded entirely, and a node in no surviving argument becomes a singleton chain; premise-only nodes belong to no chain. Each argument keeps its own `arg_` id: two independent arguments for one conclusion stay two chains (never a unioned premise set — the exact corruption edge-grouping invited). The partition must cover every chain **exactly once** — a true partition; duplicates fail validation exactly like gaps (owner amendment 2026-09-29: variety accumulates ACROSS sets, never within one — the at-least-once doctrine is dead). `chainCoverage` is the soundness check: only `missing` fails a partition, `duplicated` is informational.
+**A chat kind, not a pipeline.** A practice session is a chat record with `kind: "practice"` (`ChatKind`, `contracts/chat.ts`; `ChatStore.createChat(title, "practice")`); teach records carry no kind. It is created from the home screen's teach/practice switch or `/chat/new?mode=practice` (`components/new-session.tsx`), optionally with propositions picked from the graph: the picker, or the chain table's select mode ("Practice these"). `POST /api/chats` turns the picks (up to 64) into a `graph-context` marker as the record's first message: the picks with the name/statement the learner saw, plus the stored chains among them (`chainsForSelection`, `src/core/chains.ts`) as chain lines from the current graph. The same marker serves teach sessions created with picks.
 
-**Self-contained sets.** A `ProblemSet` freezes its world at creation: the selected node ids, a **propositions snapshot** (`Record<nodeId, {name, statement}>`), and the derived chains all persist into the set (`data/practice/*.json`, one file per set, `PracticeStore` port). Generation, grading, coverage, and the UI read ONLY the set — later extractions can never shift the ground under a live or historical set.
+**The practice agent.** `chat-handler.ts` builds `createPracticeAgent` (`src/agent/teacher-agent.ts`) for every turn of a practice record — no prober, no handoff. Its instructions are `composeInstructions("practice")`: the shared fragments plus `src/agent/prompts/practice/{00-base,10-doctrine}.md`. Its tools (`practiceTools`, `src/agent/tools/practice.ts`):
 
-**The three axes are discretized named levels** (owner, 2026-09-29 — never a number to interpolate; there is no continuum between levels): the **ladder rung** (the main axis — 0 Worked example, 1 Completion, 2 Direct exercise, 3 Composition, 4 Path-finding; the invocation names the rung and the generator builds exactly that CLASS of problem), the **cue distance** (0 Lesson context — the textbook/toy-example shape in the teaching's own framing; 1 Adjacent context — a genuinely new situation built from the teaching's own world; 2 Far context — the edge of the recognizable band, where the proposition must still genuinely apply and be findable by looking), and the **presentation** (Theory — the subject's own terms, or Application — a concrete worldly affair in which the proposition's structure appears in the wild; it dresses the situation, never changes the rung or the cue distance). The names + one-line definitions live in one place (`src/core/practice.ts`'s level tables) and are spoken by everything: the agents' prompts (`renderParams`), the creation dialog's stepped controls, the exam header's levels line. Creation defaults: rung 2 Direct exercise · cue 1 Adjacent context · Theory. The API validates the exact unions — a float between rungs is a 400; legacy float-params sets fail the store validator and are skipped (no migration — `data/practice` is disposable scratch).
+- `problem` poses one problem and ends the turn; its `modelSolution` (the commitment) rides the call's arguments, hidden from the learner UI. Targets validate against every graph proposition (`graphNodes`).
+- `conclude` ends the active problem with an outcome (solved, solved with hints, moved on, surrendered, dismissed) and a verdict, reveals the committed solution, and lets the same reply pose the next problem.
+- A turn-scoped gate (`createPracticeGate`, seeded from `activeProblemOf` in `core/native-messages.ts`) refuses posing while a problem is active and concluding when none is.
+- Also `read`/`ls`/`find`/`grep` over the learner's files, the `research` and `pdf` jobs, and the gated graph tools. Everything is wrapped by `healToolRecord`.
 
-**Two-stage generation.** One **partitioner** agent reads the chains plus the three NAMED-LEVEL parameters and submits the true partition; each partition becomes one problem's target. Then **one generator agent per problem**: its prompt carries the problem-engineering framework verbatim (the owner's doctrine — the three distances, the search-to-solution axis, the rung ladder, reverse/discriminate/probe-the-premises, the standing prohibitions, the formatting doctrine — full Markdown, LaTeX math, fenced code, tables/lists; prose-only renderings of structured content are a defect), **YOUR TARGET** (the assigned chains echoed verbatim — the echo law: the submit's chain set must equal the assignment exactly), and **THE FULL SET** (the whole selection: outside propositions are supporting material the generator may draw on with minimal use and maximal focus; the never-announce law covers ALL propositions). The submit is commit-before-pose — statement, solution, and rubric arrive together (the same sycophancy mitigation the quiz/explain mechanic uses); a problem never exists without its pre-written answer. Generators run in parallel (a process-wide 3-permit semaphore shared with grading) with per-problem failure isolation: one bad problem errors alone; the set still reaches `ready`. **Dedup across sets**: each generator also sees the problems of the ≤5 most recent sets sharing a node, so situations don't repeat between sets; within a set, parallel generators can't see each other — accepted for V1 (owner ruling).
+**UI and markers.** While a problem is active, `components/practice-dock.tsx` replaces the composer; `components/practice-cards.tsx` renders the problem, conclusion and thinking cards in the transcript. The learner's work arrives as input events that append `practice-thinking` and `practice-next` markers; ESC dismissal appends `problem-dismissed` (silently, or parked for a running turn) and the agent concludes it as dismissed. The sidebar filters sessions by kind and flags a practice session with a pending problem.
 
-**Grading is score-only (owner redesign, 2026-09-29).** ONE ATTEMPT: each problem has its own submit button; once submitted the answer persists and the problem is done — the route refuses re-submission forever after. The submit reveals INSTANTLY (no waiting on the grader): the answer locks read-only, the model solution shows, the rubric sits collapsed. Grading fires one **grader** job per answered problem — the grader sees the problem, the propositions its chains touch, the pre-written solution and rubric, and the learner's answer, never the full set (minimal, by ruling) — and returns an integer **score 0–10 plus one or two sentences of reasoning** (which rubric points were met or missed, which proposition failed to come to mind). The score lands on the problem via the page's events-channel tick (activity-changed → debounced liveness read, S7) and updates live; grades never serialize set-wide (submitting B while A grades is fine — the shared pool bounds parallelism). Nothing reaches the graph, no level, no count, anywhere. A dropped grade leaves the answer standing with an honest “grade interrupted” line — one attempt, no re-submission.
+**What it writes.** Only its chat record. The settle path skips extraction for practice records ("practice sessions write nothing"), so no ledger, coverage or source is touched; compaction works as for teach sessions (kind `practice`).
 
-**The jobs pattern — registry, not JobRecords.** Practice runs are NOT Workbench jobs: no `JobStore` records, no steer messages, nothing ever wakes the teacher — a practice run isn't chat-scoped (a set outlives its birth session and has no lesson to re-enter; its result is itself, persisted in its own store and read by its own page). What it shares with the Workbench is the observability surface: a `globalThis` run registry (the module-instance idiom — `__lhPracticeRuns`) with PER-PROBLEM ROWS (owner ruling, 2026-09-29 — matching the extraction per-chunk pattern): `setId:partition` while the partitioner runs ("Partitioning — title"), then one `setId:gen:problemId` per problem ("queued"→"generating", label "Problem i/N — title"), and one `setId:grade:problemId` per graded answer ("queued"→"grading", "Grading i/N — title") — each row its OWN abort controller and its OWN usage accumulation; the row key IS the feed id (the dock dup-key law) and the abort target. ABORT ROUTES BY ROW SHAPE: a gen-row abort kills THAT problem only (siblings continue; the set still settles `ready` with one errored problem), a partition-row abort ends the whole run, a grade-row abort drops that grade (answer kept — one attempt, the problem stays done); set-level abort (delete) composes from row aborts plus the synchronous persisted marks. Model calls — partitioner included — run under the SHARED background-LLM semaphore (`bg-llm-semaphore.ts`): one process-wide pool of 3 permits for ALL background LLM jobs, extraction chunks included (total background LLM concurrency bounded at 3, whoever calls). A boot sweep marks orphaned `partitioning`/`generating` sets as `error "Interrupted (server restarted)"` — once per process, and only when the set's `updatedAt` heartbeat is >120s stale (a live run's 30s FILE watchdog keeps the heartbeat fresh even across dev's per-worker processes — the registry is not shared between them; the guard trio closed a live-stamping bug from the first live test) — the job runner's crash-honesty at set grain. Store writes serialize behind a per-set mutex; the pipeline is the sole writer of `data/practice`.
-
-**API + UI.** Creation is GRAPH-DOMAIN, not chat-domain (owner ruling 2026-09-29: "problem sets always take in nodes — graph objects"): `POST /api/practice/sets` takes `{nodeIds, params, title?, note?}` ONLY — no chatId, no clusterId; the UI resolves a picked cluster to its member node ids and passes the cluster's label as the title. The `note` is the learner's optional free-form creation input (owner, same evening: more learner control, no other purpose): trimmed, capped at 2000 characters, persisted on the set, and carried to the partitioner and every generator as `THE LEARNER'S NOTE` — an additional input the agents WEIGH but are never obliged to follow (the doctrine pins the stance: it never moves a problem off its rung or out of its band, and the partition laws always win). `GET /api/graph/clusters` serves the picker: the birth-session partition itself (`birthSessionPartition`, same ordering — size desc, ties by id) — EVERY group regardless of size (owner ruling, same evening: MIN_CLUSTER_SIZE is a hull-drawing rule; practice availability must not inherit a visual threshold), each as `{key, kind: "chat"|"notes", label, nodeIds, nodeCount}`; a cluster whose naming record is gone keeps `label: null` — honest, never guessed. 202 `{id}` with generation fire-and-forget; 400 empty selection (empty intersection with live nodes — the vanished-nodes edge) / bad params; 503 model/key refusal. `GET /api/practice/sets` · `GET/DELETE /api/practice/sets/[id]` (delete aborts live runs first) · `POST /api/practice/sets/[id]/answers` (202; 409 when not ready; 400 re-answering a submitted problem — one attempt). Surfaces: `/practice` (the list — THE shared **TopBar** (`components/top-bar.tsx`, standardization ruling 2026-09-29: one element, every surface — h-15 matching the sidebar's wordmark band, `lh-drag` where NATIVE interactive children carve out AUTOMATICALLY (the globals.css auto carve-out: inside any drag band, `button/input/textarea/select/a/summary/[contenteditable]` are no-drag islands — owner standardization ruling 2026-09-29 night; manual `lh-no-drag` is only for clickable non-natives), `select-none` so drags never highlight, the SidebarToggle reopen with its Electron traffic-light gutter, `px-3` + one border line; chat's rename mode passes `drag={false}` — the one escape hatch). The overlay twin of the mask law rides with it: app-region subtraction resolves by DOM order, not z-index, so any surface containing a TopBar that COVERS other content (a full-bleed overlay) must be the LAST child of its container — born from the chains-overlay bug, where the graph chrome's lh-no-drag column (later in DOM, geometrically under the overlay) punched dead zones through the bar's drag band over the counts/search/close area with the New action at the right edge, status/counts rows, delete confirm, the new-set dialog with the named-level controls (a 5-detent ladder slider, a 3-detent cue slider, a Theory|Application toggle — each showing the level's name + definition), the cluster picker, and the optional free-form note textarea (typing-only). The SECOND creation entry (owner redesign, same evening): the graph view's **chain table** — a `Chains` button in the graph chrome (empty graph: hidden) opens a FULL-BLEED table overlay (absolute inside the graph area; the blur + translucent background IS the surface, no inner card; the top bar is THE shared TopBar — the standard title size and drag mechanics, the sidebar reopen, and the close X at the right edge, so home's window-drag mask never eats it (the overlay covers home's floating header while open, and the TopBar's own toggle is the reopen path); Esc or X dismiss). The hierarchy is three levels, one click each: CLUSTER (the birth session — a chat or a notes file; a chain lives where its CONCLUSION was born) → REASONING CHAIN → PROPOSITION STATEMENTS — expanding a chain reveals its members' statement text directly (names live in the chain line, never twice; a singleton reveals its one statement in a single click); everything starts collapsed. The table look (owner refinements, evening round 2): PROMINENT indentation carries the hierarchy (chains deep under their folder, statements deepest) and horizontal rules FRAME the table (owner round 5) — between cluster groups, under the header, and under the last group — with per-row lines and the vertical column hairlines still gone, and open folders/chains dropping a TREE THREAD (owner round 5, trial): a vertical guide at the expander arrow's column (37px clusters / 73px chains), BRACKETED by checkbox bottom edges (owner round 6): it starts at the parent row's own checkbox bottom — a visible gap below the arrow's stroke, never touching it — and terminates exactly at the last child row's checkbox bottom (live-measured anchors: 23/8px clusters, 22/8px chains); statement rows are PLAIN (the derivation already lives in the chain line — no conclusion marker). ALL THREE columns sort (owner: "consistency is key") — Name (A→Z default), Props (largest-first), Created (newest-first) — click toggles asc/desc, ordering both cluster rows and chains within; a SMALL chevron marks the active header. In the chain line every proposition name is a faint-outlined CHIP and THE LOGIC IS THE CONNECTIVE (owner ruling, 2026-09-30): premises join with the LaTeX LAND (∧) and the conclusion separates by the LaTeX IMPLICATION (⟹) — `A ∧ B ⟹ C`, never the misleading `A → B → C` — the glyphs are REAL KaTeX renders (`components/latex-glyph.tsx`, `katex.renderToString` — the app's math engine, never SVGs or font-dependent unicode; the katex stylesheet already rides app-wide), PROMINENT in the theme foreground (white in the dark theme — the logic is the payload, not decoration); a lonely chip reads as a standalone proposition with no glyph (the "(no premises)" annotation is dead in the visible UI; it and the plain-text `→` survive only as the row's aria-label); icons: ONLY the cluster FolderIcon (open-folder when expanded) survives (owner ruling, evening round 3: the chain waypoints icons are not needed — the chips + connectors already read as chains); chevrons rotate with expansion and share the checkbox's 14px width, which makes every column exactly 18px and the ALIGNMENT STAIRCASE exact (owner rulings, rounds 3–4): each level's checkbox sits under its parent's ICON slot — open a folder and the chain checkboxes line up with the FOLDER icon; the statements step to where a chain icon WOULD sit (the steps are TWO columns = 36px — "double the indentation"): clusters pl-3 → chains pl-12 → statements pl-21. Selection is checkboxes on whole clusters, chains, or single propositions — a flat node-id set (a node in several chains is one selection) — accumulated in a FLOATING BOTTOM BAR (the Google-Photos pattern: appears only when something is selected, never shifts the table layout) showing the agents' ACTUAL input (`chainsForSelection` over the selection: a premise picked without its conclusion counts as the singleton it becomes) as `N nodes → M chains` (NODE is THE UI word for graph objects — owner ruling, 2026-09-30, standardized across every surface's copy), with Clear and **Generate problem set**, which opens the SAME creation dialog in **custom mode**: no cluster picker — a selection summary (the derived shape + the dated default title the pipeline will stamp) — posting `{nodeIds, params, note}` with no title. A fuzzy search (names, aliases, statements) filters chains grouped + auto-expanded under their clusters (non-matching clusters hide; the collapsed view returns on clear). NO understanding-levels column (explicitly not built). The bar also carries **Delete** (owner, 2026-09-29 night: "this is really the view deletion should be done in") FENCED at its right end — a divider + the destructive red pair + a trash icon, the safe actions and the kill switch never blending — and it opens the SAME full-death confirm dialog the canvas uses (`DeleteNodeDialog`, body-portal z-50) — MINIMAL by owner ruling (2026-09-30): NO pre-flight impact read (what full death takes is obvious, the fetch flickered, and richer facts would only confuse as deletion semantics evolve toward rewiring), just `Delete node?` / `Delete N nodes?` + the names in the mono block (capped at 8 + "and K more") + one permanence line + Cancel/Delete (the `GET /api/graph/nodes/[id]` impact route and its engine died with the read); confirm runs the per-node DELETEs SEQUENTIALLY — a failure stops the run (extraction_running is never plowed through), what died stays dead — then prunes the selection and announces `lh:graph-revision` so the snapshot refetches. This ends the overlay's read-only stance: the chain table is the graph's MANAGEMENT surface, and `/practice/[id]` (the exam page — the shared TopBar, a levels + status line, numbered problems, markdown statements with math healing at the display seam, a textarea + focus-gated dictation bar per problem with its OWN Submit button — one attempt per problem, instant solution/rubric reveal, the score landing live). Entry: the sidebar's Practice nav row.
-
-**Model wiring.** Three roles — `partitioner`, `problemGenerator`, `grader` — all pinned to the **strong** slot (quality-critical, one settings edit from cheap) and in `BACKGROUND_MODEL_ROLES` (per-role overrides). The stage agents are single-submit loops on the shared `runSubmitAgent` seam (`submit-agent.ts`, extracted from extraction for exactly this): a `validate` hook turns a bad submit into a tool-input error the model retries against, within `maxTurns 4`; exhaustion fails the stage honestly (the set says so, the chains re-run cleanly on a new set).
+**The chain table** (`components/chain-table.tsx`, the graph view's `Chains` overlay) is the graph's management and selection surface: birth-session clusters → reasoning chains → proposition statements, sortable, fuzzy-searchable, with checkbox selection. Its floating bar either deletes (the same full-death confirm dialog as the canvas, §6) or, in select mode, hands the selection to a new practice session.
 
 ---
 
@@ -411,10 +405,10 @@ flowchart LR
         MAIN -->|"loadURL, sandboxed renderer"| REND["Browser renderer (components/)<br/>fetch/WebSocket to own origin only"]
     end
     subgraph OUTSIDE["outside the process"]
-        OR["OpenRouter (BYOK key from auth.json, env-injected — never argv)"]
+        OR["LLM providers via pi-ai (API keys from auth.json, read by the server via LH_AUTH_FILE; subscription leases from Electron main over IPC)"]
         DG["Deepgram STT (browser-direct WebSocket)"]
-        GCSE["Google CSE / Jina (researcher tools)"]
-        CHROME["system Chrome (headless: demo verify · SVG render)"]
+        GCSE["Tavily / Brave search · Jina reader (researcher tools)"]
+        CHROME["browser service (Electron) or system Chrome — demo verify"]
         DISK["data/ ledgers (via LH_DATA_DIR seam)"]
     end
     NEXT --> OR
@@ -426,6 +420,10 @@ flowchart LR
 ```
 
 The Electron main is a launcher + credential/security guard, never a host for teaching or inference logic: single-instance lock, deny-by-default permissions, origin-pinned navigation, sandboxed renderer. All Next.js code runs unchanged in a child process (`output: "standalone"`), relocated by the `LH_DATA_DIR` seam (also the test seam — `data-dir-seam.test.ts` covers it, including a fresh-child-process case). The build hard-fails if repo `data/` would leak into the bundle or if prompt assets fall out of the trace (`scripts/build-server.mjs`).
+
+`proxy.ts` guards `/api/*` in desktop mode: Electron main passes a per-launch `LH_DESKTOP_API_SECRET` to the server child, and requests must carry it as the `x-learnharness-desktop` header (`src/server/desktop-access.ts`); in browser mode the check is a no-op. Besides the server child's ChatGPT (`lh:chatgpt`) and subscription (`lh:subscriptions`) IPC channels, the renderer bridge (`electron/preload.cjs`) exposes zoom, window-expand, open-settings, update and subscription-control channels.
+
+**Auto-update** (packaged builds only, `setupAutoUpdater` in `electron/main.cjs`): electron-updater reads upstream's GitHub Releases feed, checks at launch and every 24 hours unless `general.autoUpdate` is false (manual checks always run), downloads automatically and installs on quit. **Fork local builds never update**: `scripts/desktop-local.sh` stamps `lhLocalBuild: true` into the packaged `package.json` (electron-builder `extraMetadata`), and `setupAutoUpdater` then never loads electron-updater and reports status `disabled`, so Settings shows no update controls. The fork's daily app is rebuilt from the `release` branch instead ([fork-workflow.md](fork-workflow.md)).
 
 ---
 
@@ -474,7 +472,9 @@ For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes these same
 
 ### Known deviations from the ideal (documented, deliberate or accepted)
 
-- Two portless settings adapters re-exported through the server barrel; `observability.ts` imports `chatStore` directly. The "only `stores.ts` imports adapters" rule is documentation-only.
+- The server barrel re-exports four adapters (`render-settings`, `settings`, `promptOverrides`, `authStore`), and `keys.ts`, `model-catalog.ts` and `observability.ts` import adapters directly. The "only `stores.ts` imports adapters" rule is documentation-only.
+- `src/server/web-subscriptions.ts` requires the Electron controllers (`electron/chatgpt.cjs`, `subscriptions.cjs`, `chatgpt-ipc.cjs`, `subscription-ipc.cjs`) to own web/dev subscription credentials — a server→electron import no lint zone covers.
+- `src/core/coverage.ts` imports `node:crypto` yet is exported by the browser-safe core barrel.
 - `scripts/` and `electron/` are lint-exempt; scripts act as extra composition roots (and backfills are, by design, extra graph writers); `tests/` imports freely across layers.
 - Small conventional-only sync points: `SIDEBAR_AUTOCLOSE` mirrored in `electron/main.cjs` ↔ `components/sidebar.tsx`; IPC channel names mirrored by comment; the jobs dir path hardcoded in the adapter rather than `config.ts`.
 
@@ -482,7 +482,7 @@ For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes these same
 
 ## 10. Observability and change delivery (the push model, owner ruling 2026-10-02)
 
-Structured-logging frameworks are still deferred; the baseline is one correlation-tagged log line per event at the seams (`[chat <id>]` on turn services, `[extraction <id>]` on the pipeline, `[job <id>]` on runners, `[graph]` on reads). What has grown past log lines is the **activity feed** (`server/observability.ts` → `GET /api/activity` → the activity dock): running jobs, extraction runs, and practice runs (per-set rows: generation/grading phases), per-run usage (money channel), and true abort (`POST /api/activity/abort` — kind `job`/`extraction`/`practice`). When structured logging lands, it goes behind these seams — no call sites change.
+Structured-logging frameworks are still deferred; the baseline is one correlation-tagged log line per event at the seams (`[chat <id>]` on turn services, `[extraction <id>]` on the pipeline, `[job <id>]` on runners, `[graph]` on reads). What has grown past log lines is the **activity feed** (`server/observability.ts` → `GET /api/activity` → the activity dock): running jobs and extraction runs, per-run usage (money channel), and true abort (`POST /api/activity/abort` — kind `job`/`extraction`/`turn`). When structured logging lands, it goes behind these seams — no call sites change.
 
 ### 10.1 The events channel — how the client learns truth moved
 
@@ -494,9 +494,12 @@ Before 2026-10-02 the client discovered server-side change by polling: a lattice
 |---|---|---|
 | `turn-started` | `{chatId}` | `beginTurn` success (after the registry write; the double-begin 409 path is silent) — every turn, client-initiated included |
 | `turn-settled` | `{chatId}` | `endTurn` on a live entry — fires after `persistTurn`, so fetches read durable truth |
-| `jobs-changed` | `{chatId}` | every job-store write (create/update/delete-that-removed) |
-| `activity-changed` | `{}` | extraction `setPhase`/`finishExtraction`; practice `registerRow`/phase-writes/`finishPractice` |
+| `jobs-changed` | `{chatId?}` | every job-store write (create/update/delete-that-removed) |
+| `activity-changed` | `{}` | extraction phase changes (`subagents/extraction.ts`) |
 | `chats-changed` | `{}` | list-shape writes only: chat create/rename/delete-that-removed |
+| `subscriptions-changed` | `{}` | web/dev subscription state changes (`server/web-subscriptions.ts`) — no account or credential data |
+| `record-changed` | `{chatId}` | a record write without a turn: silent dismissal (`/api/chats/[id]/dismiss`, `dismissal-park.ts`), an answer saved while another question is open (`chat-handler.ts`), compaction's marker (`server/compaction.ts`) |
+| `compaction-changed` | `{chatId, running}` | compaction start/finish (`server/compaction.ts`); `running` is the send gate the composer and docks mirror |
 
 ### 10.3 Emitter laws
 
@@ -512,7 +515,7 @@ The bus itself is a `globalThis`-backed listener set (the Next per-entry-module 
 - **Refs, not closures** — handlers read `localStreamRef`/`turnInFlightRef`/`statusRef`, never stale render state.
 - **The 409-race guard** — on `turn-started`, ignore when `localStreamRef.current` is held (the client's own turn just began; it owns that stream) or already attached; otherwise attach to the running turn (`GET /stream` live response).
 - **No mid-attached-stream sync** — while attached, the terminal frame owns settle; a `turn-settled`-triggered `syncFromServer` would swap a stale snapshot and break in-place continuation (the one exception: error status heals by detaching).
-- **~250ms trailing debounce** — bursty emitters coalesce into one fetch per window (sidebar/dock/jobs/graph/practice all share the shape).
+- **~250ms trailing debounce** — bursty emitters coalesce into one fetch per window (sidebar/dock/jobs/graph all share the shape).
 - **Resync on reconnect** — every consumer refetches once when the channel (re)opens.
 
 ### 10.5 What remains bounded or local, and why
@@ -530,10 +533,10 @@ All deterministic, no network: engines are injected (pi-ai's **faux provider** �
 
 1. **Pure core units** — merger via real adapters, derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts, prices, fuzzy search.
 2. **Server flows** — `handleChatRequest` driven end-to-end with scripted faux engines: persistence, liveness, steer claiming, the wake pipeline (409 retry, quiz deferral, idempotency), crash recovery, the data-dir seam (including a fresh child process).
-3. **Sub-agent loops** — researcher/demo-builder/visual-maker with fake headless APIs; the extraction pipeline end-to-end (audit drops, failure-checkpoints-nothing, single-flight, abort); the practice pipeline end-to-end (partition echo/coverage retries, failure isolation, semaphore width, abort mid-generation, grading, boot sweep).
-4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage, stats, practice surfaces (creation dialog both modes, chain table incl. the shared-TopBar + lines-law pins, list, exam states) via React server-side rendering (`renderToStaticMarkup`), no DOM library.
+3. **Sub-agent loops** — researcher/demo-builder/visual-maker with fake headless APIs; the extraction pipeline end-to-end (audit drops, failure-checkpoints-nothing, single-flight, abort); practice sessions (`practice-agents`, `practice-flow`, `practice-heal`, `practice-record`: the problem/conclude gate, record folding, argument heal, the agent's tool set).
+4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage, stats, practice surfaces (`render-practice-surface`), the chain table (`render-chain-table`), via React server-side rendering (`renderToStaticMarkup`); a few UI tests parse the markup with linkedom.
 
-Gates on every change: `tsc` clean, all tests, `eslint` clean, `next build` clean.
+Gates on every change: `tsc` clean, all tests, `eslint` clean, `next build` clean. The bundled Python skill (`skills/learnharness/`) has its own `unittest` suite under `tests/skills/`.
 
 ---
 
@@ -547,14 +550,15 @@ Every place the architecture is designed to be cut — the "one file" a future c
 | LLM engine / model per role | settings `models` slots + `src/agent/models.ts` (`piEngineFor`) | provider wiring, one place |
 | Turn composition | `src/server/chat-handler.ts` | what a turn consists of |
 | Extraction trigger | `src/server/turn-service.ts` (`triggerExtraction`) | when the Library runs |
-| Practice orchestration | `src/agent/subagents/practice-pipeline.ts` | generation/grading flow without touching contracts |
+| Practice tools | `src/agent/tools/practice.ts` (`practiceTools`, `createPracticeGate`) | what a practice session can do, one gate |
 | Graph access for teacher | `src/agent/tools/graph.ts` (`list_sessions` / `list_propositions`) | what the teacher can probe, one gate |
 | Steer delivery (wake) | `src/server/jobs.ts` + injected `deliver` | how background results re-enter lessons |
 | Push events | `src/core/events.ts` (bus) + `src/server/events-stream.ts` (SSE seam) + `components/server-events.tsx` (the window's EventSource) | change notification, end to end |
 | Agent construction (tests) | `handleChatRequest(req, buildAgent?)` | scripted engines, no refactor |
-| Sub-agent verification | `sub-agents/headless.ts` (`headlessOverride`) | demo/SVG verification, no Chrome |
+| Sub-agent verification | `src/agent/subagents/headless.ts` (`headlessOverride`) | demo/SVG verification, no Chrome |
 | Data location (Electron) | `LH_DATA_DIR` env (`config.ts` PATHS) | where data/ lives, nothing else |
 | Desktop host | `electron/main.cjs` | launcher/security shell only |
+| Fork local build | `scripts/desktop-local.sh` + `lhLocalBuild` (`electron/main.cjs`) | how the fork's daily app is built, and that it never takes upstream's updates |
 
 ---
 
@@ -571,6 +575,9 @@ Each of these was implemented, lived in real data, and was replaced; the replace
 | every-N-quiz-answers extraction trigger | Token-coverage batches (fingerprint ledger) | 2026-09-15 (vision-extraction-coverage) |
 | sigma.js + graphology + forceAtlas2 + Louvain clustering | Hand-rolled Canvas 2D renderer, d3-force layout, embedding-based agglomerative clusters | 2026-09-13 era |
 | Vercel AI SDK LLM loop (`MockLanguageModelV4` tests) | pi-ai engine (faux-provider tests), AI SDK kept as the UIMessage protocol | pi-engine-swap |
+| Semantic top-K context injection (session-start steer) | Gated graph tools the agent calls itself (`list_sessions` / `list_propositions`) | 2026-09-23 |
+| AI SDK `UIMessage` records + `server/pi/record-adapter.ts`; UIMessage SSE with `addToolOutput` | pi-native `LhMessage` records (Wave B) and the native pi event wire (Wave D) | 2026-09-26 |
+| Practice problem-set pipeline (partitioner → generator → grader; `data/practice`, `/practice`) | Practice as a chat kind: `createPracticeAgent` with `problem` / `conclude` | 2026-10-04 |
 
 ## 14. Deliberately deferred
 
