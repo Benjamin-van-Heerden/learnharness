@@ -1,6 +1,6 @@
 # Learning Harness — Architecture
 
-Status: **the canonical architecture spec for this fork** — it describes the code in this repository, which takes upstream (amosblomqvist/learnharness) in by merge. Upstream's full audit (2026-09-18) established it; on 2026-10-27 it was brought back in line with the code (practice sessions, the pi-native message record and stream wire, the ports, the event vocabulary, search, the Electron channels), and it changes in the same commit as any change to what it describes. The pre-audit spec is archived at [`archive/architecture-2026-09-08.md`](archive/architecture-2026-09-08.md) — history only. Product reasoning lives in [`docs/vision.md`](vision.md); the file-by-file map lives in `.mem/structure.md`; the fork's build and upstream-intake loop in [`fork-workflow.md`](fork-workflow.md).
+Status: **the canonical architecture spec for this fork** — it describes the code in this repository, which takes upstream (amosblomqvist/learnharness) in by merge. Upstream's full audit (2026-09-18) established it; on 2026-10-27 it was brought back in line with the code (practice sessions, the pi-native message record and stream wire, the ports, the event vocabulary, search, the Electron channels), and it changes in the same commit as any change to what it describes. The pre-audit spec is archived at [`docs/archive/architecture-2026-09-08.md`](archive/architecture-2026-09-08.md) — history only. Product reasoning lives in [`docs/vision.md`](vision.md); the file-by-file map lives in `.mem/structure.md`; the fork's build and upstream-intake loop in [`fork-workflow.md`](fork-workflow.md).
 
 **What this is.** A standalone learning app (web + Electron desktop): the learner's knowledge accumulates into one persistent, cross-session knowledge graph, built from tutoring sessions in which a teacher agent authors a formal, visible dependency tree (the plan tree) and verifies understanding with structured questions. The graph is the home page; the session is the classroom; everything else serves those two.
 
@@ -266,7 +266,7 @@ Three server-side systems, each the sole writer of its own store, connected by n
 
 ## 5. The session (one chat turn)
 
-`handleChatRequest` is framework-free (plain `Request`/`Response`) with a `buildAgent` test seam so tests drive it with scripted engines. It parses `{chatId, input}` (`parseChatInput`, `core/input-events.ts`: text, answer, continue, practice thinking/next, dismissals; the wake pipeline's steers enter `handleChatInput` directly). The turn, in exact order:
+`handleChatRequest` is framework-free (plain `Request`/`Response`) with a `buildAgent` test seam so tests drive it with scripted engines. It parses `{chatId, input}` (`parseChatInput`, `core/input-events.ts`: text, answer, continue, retry, practice thinking/next, dismissals; the wake pipeline's steers enter `handleChatInput` directly). The turn, in exact order:
 
 ```mermaid
 sequenceDiagram
@@ -278,7 +278,7 @@ sequenceDiagram
     participant A as prober / teacher / practice agent (pi engine)
     participant F as settle seams
 
-    B->>R: {chatId, input} (text · answer · continue · ...)
+    B->>R: {chatId, input} (text · answer · continue · retry · ...)
     R->>H: parseChatInput → handleChatInput
     H->>H: model gate + provider-key gate (503 envelopes, nothing changes)
     H->>H: ensureCompacted (waits for, or runs, compaction)
@@ -286,7 +286,7 @@ sequenceDiagram
     H->>L: beginTurn(chatId)
     Note over H,L: already running → 409; the client backs off and retries
     H->>CS: saveMessages (write-ahead: input persists before any agent runs)
-    H->>A: build from the record: practice kind ⇒ practice agent;<br/>probe_done in transcript ⇒ teacher; else prober
+    H->>A: build from the record: practice kind ⇒ practice agent;<br/>successful probe_done result ⇒ teacher; else prober
     Note over H,A: asAgentMessages(record) — pi-native replay
     A-->>B: runPiTurn: pi AgentEvents as SSE (registerTurn: other views reattach via GET /api/chats/[id]/stream)
     Note over B: quiz / ask_user_question / problem are answered in the docks;<br/>quiz answers graded client-side via question-core
@@ -299,11 +299,12 @@ sequenceDiagram
 ```
 
 - **Question tools** (`quiz` or `explain`, `probe` or `recall`, `ask_user_question`) have no server execute: the call streams to the browser, the learner answers in the dock, and the answer arrives as the next input event (`{type: "answer", toolCallId, answer}`); quiz answers are graded client-side via `question-core` (`buildAnswer`). A pending question persisted in the record is exactly what makes **resume mid-question free**. Deterministic seeded shuffling (keyed by toolCallId) keeps server and client renders identical. ESC dismissal posts to `/api/chats/[id]/dismiss`, which writes silently or parks the dismissal for the running turn (`dismissal-park.ts`).
-- **The prober→teacher handoff**: the first turn(s) run the prober (floor/ceiling via probe, goal via ask); `probe_done` (server-executed) files the assessment and queues the handoff steer (`buildProbeHandoffSteer`, saved as a `probe-handoff` marker); once `hasProbeDone(record.messages)`, the handler builds the teacher agent for every later turn. Phases (`core/phases.ts`) fold strictly: probe → plan → teach. Practice sessions skip this: they run the practice agent from the first turn (§7).
+- **The prober→teacher handoff**: the first turn(s) run the prober (floor/ceiling via probe, goal via ask); `probe_done` (server-executed) files the assessment and queues the handoff steer (`buildProbeHandoffSteer`, saved as a `probe-handoff` marker); once `hasProbeDone(record.messages)` — a `probe_done` call from a completed generation with a matching, non-error result not refusing with `ok: false` (`probeDoneResultIds`) — the handler builds the teacher agent for every later turn; a failed or aborted generation's call grants nothing. Phases (`core/phases.ts`) fold strictly: probe → plan → teach. Practice sessions skip this: they run the practice agent from the first turn (§7).
 - **The formal plan tree is author-once**: the teacher authors the session's dependency map with a single schema-validated `plan_init` tool (a mermaid-subset graph, parsed deterministically with line-numbered errors, validated as a DAG). Progress is never mutated — statuses (`current`/`visited`/upcoming) are **derived** from tagged quiz calls in the transcript; the tree panel and the plan blocks render that derivation.
 - **Job tools are server-executed, ack-and-steer**: `research`/`demo`/`visual`/`pdf` resolve immediately mid-turn with a fire-and-forget ack (the teacher keeps teaching); `spawn(job, input)` fires the background runner. The prober and the practice agent carry the `research` and `pdf` subset. `send_to_user` is added for Claude models only (`teacher-agent.ts`).
 - Turn services are named seams taking explicit dependencies. Extraction contains its errors, but **canonical persistence must not fail silently**: a failed input write refuses acceptance without starting an agent; `persistTurn` throws on a failed reply write. The runner reports settlement failure before `[DONE]` and releases liveness even when normal settlement fails. Steer reconciliation uses the durable record, so a later bookkeeping failure cannot replay already-saved learner input.
 - **Late attachment must still see settlement failure.** A small, memory-only notice per session precedes the settled stream terminal when the failing turn has already left the live registry. The next accepted turn, successful session deletion, or server exit clears it. Reopening seeds the existing banner from that notice and waits for ordinary learner input; dismissing the banner is not permission to automatically retry the model. No synthetic failure entry is added to the saved transcript.
+- **Retrying a failed response** (`{type: "retry"}`, the error banner's Retry): `retryDrops` (`core/input-events.ts`) names the trailing failed assistant attempts, which are omitted only from the turn's temporary agent history; the saved record keeps every failed attempt. Retry is refused (400, before any turn effect) when the record does not end in a retryable failure, or when a compaction landed after it, and eligibility is rechecked after the handler's awaited gates. `toLlmMessages` never synthesizes results for tool calls in error/aborted generations (pi drops those messages), and the active compaction summary supersedes every older compaction marker in the retained tail.
 - **Recovery never blindly resends an answer.** Submitted question drafts survive optimistic unmount in memory; the existing Submit action reconciles uncertain acceptance against the canonical record and running-turn state before sending again. EOF or a rejected stream read without a terminal triggers one read-only reattachment; another transport failure shows the existing error banner rather than claiming completion. Explicit completion, cancellation, and the literal-final-entry saved-error rule remain unchanged.
 
 ### 5.1 The wake pipeline (Workbench → Classroom)
