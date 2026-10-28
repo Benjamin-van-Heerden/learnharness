@@ -24,13 +24,14 @@
  *     would shadow every settings-page key change until restart.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require("electron");
 const { createChatGPT, fileStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
 const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
 const { attachSubscriptionChild, subscriptionControl } = require("./subscription-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
 const { openWebSubscriptionBrowser } = require("./web-subscription-browser.cjs");
+const { resolveAtStartup } = require("./data-folder.cjs");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -52,7 +53,11 @@ const PRODUCT_NAME = "LearnHarness";
 // "LearnHarness-dev".
 app.setName(PRODUCT_NAME);
 const AUTH_FILE = () => path.join(app.getPath("userData"), "auth.json");
-const DATA_DIR = () => path.join(app.getPath("userData"), "data");
+// FORK: the data folder is user-chosen (electron/data-folder.cjs), resolved
+// once per launch in main(); secrets and logs stay in userData. Until then
+// (and in the dev shell, which spawns no server) it is the default.
+let dataDir = null;
+const DATA_DIR = () => dataDir ?? path.join(app.getPath("userData"), "data");
 
 /** The packaged standalone server (extraResources → Resources/server).
  *  In dev LH_DEV_URL short-circuits everything: no spawn, no packaging —
@@ -685,6 +690,11 @@ async function main() {
 			},
 		});
 		await subscriptions.ready;
+		dataDir = resolveAtStartup({ userData: app.getPath("userData"), dialog });
+		if (dataDir === null) {
+			app.quit();
+			return;
+		}
 		log(`starting server: ${serverEntry()}`);
 		log(`data dir: ${DATA_DIR()}${fs.existsSync(AUTH_FILE()) ? " · auth.json: present" : " · auth.json: ABSENT (no BYOK keys yet)"}`);
 		await startServer(new URL(url).port);

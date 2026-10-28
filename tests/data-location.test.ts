@@ -88,8 +88,10 @@ describe("copyVerified and moveData", () => {
 		const dst = path.join(root, "iCloud", "Learning");
 		seedData(src);
 		const before = tree(src);
-		await moveData(src, dst);
+		let sourceAtSave: boolean | null = null;
+		await moveData(src, dst, { beforeDelete: () => { sourceAtSave = fs.existsSync(src); } });
 		assert.deepEqual(tree(dst), before);
+		assert.equal(sourceAtSave, true, "the location is saved while the source still exists");
 		assert.equal(fs.existsSync(src), false);
 	});
 

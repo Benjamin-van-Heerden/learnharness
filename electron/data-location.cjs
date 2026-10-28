@@ -132,9 +132,12 @@ async function copyVerified(src, dst, { copyFile = fsp.copyFile } = {}) {
 	}
 }
 
-/** copyVerified, then delete the source (owner decision: no backup copy). */
-async function moveData(src, dst, options) {
+/** copyVerified, then `beforeDelete` (main saves the new location there, so
+ *  a failed save still has the source), then delete the source (owner
+ *  decision: no backup copy). */
+async function moveData(src, dst, { beforeDelete = () => {}, ...options } = {}) {
 	await copyVerified(src, dst, options);
+	await beforeDelete();
 	await fsp.rm(src, { recursive: true, force: true });
 }
 
