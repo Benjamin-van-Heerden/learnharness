@@ -31,7 +31,7 @@ const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cj
 const { attachSubscriptionChild, subscriptionControl } = require("./subscription-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
 const { openWebSubscriptionBrowser } = require("./web-subscription-browser.cjs");
-const { resolveAtStartup } = require("./data-folder.cjs");
+const { resolveAtStartup, registerDataFolderIPC } = require("./data-folder.cjs");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -282,6 +282,15 @@ function killServer() {
 			/* already gone */
 		}
 	}, 3000);
+}
+
+/** FORK: killServer, resolved once the child has exited — a data-folder
+ *  switch must not move files the server could still write. */
+function stopServerAndWait() {
+	const child = serverProcess;
+	const exited = child ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
+	killServer();
+	return exited;
 }
 
 /** Security posture (all defaults asserted explicitly; the guards are the
@@ -726,6 +735,15 @@ async function main() {
 	ipcMain.handle("lh:subscriptions:web-browser", async (event, action) => {
 		if (!devUrl || !trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) throw new Error("Untrusted development request.");
 		await openWebSubscriptionBrowser(action, new URL(url).origin, { openExternal: (target) => shell.openExternal(target) });
+	});
+
+	registerDataFolderIPC({
+		ipcMain, dialog, app, BrowserWindow, log,
+		userData: app.getPath("userData"),
+		available: !devUrl,
+		getDataDir: DATA_DIR,
+		isTrusted: (event) => trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) && trustedSender(event, new URL(url).origin, BrowserWindow),
+		stopServer: stopServerAndWait,
 	});
 
 	installMenu();

@@ -24,6 +24,12 @@
  *   snapshot for a late subscriber; checkForUpdates requests a manual
  *   check (including download/install-on-quit, even with automatic checks OFF).
  *
+ *   window.lh.dataFolder — FORK: the choosable data folder (Settings →
+ *   General). get() → {available, path, isDefault, defaultPath};
+ *   choose() opens the native folder picker → {canceled} or {path, kind};
+ *   apply({path, mode} | {reset: true}) stops the server, moves or adopts
+ *   the data, and relaunches the app (electron/data-folder.cjs).
+ *
  *   window.lh.onOpenSettings(cb) — menu navigation, buffered until React
  *   subscribes after a window is reopened. Browser builds have no bridge.
  *
@@ -88,6 +94,11 @@ contextBridge.exposeInMainWorld("lh", {
 	installUpdate: () => ipcRenderer.send("lh:update-install"),
 	getUpdateState: () => ipcRenderer.invoke("lh:update:get"),
 	checkForUpdates: () => ipcRenderer.invoke("lh:update:check"),
+	dataFolder: {
+		get: () => ipcRenderer.invoke("lh:data-folder:get"),
+		choose: () => ipcRenderer.invoke("lh:data-folder:choose"),
+		apply: (request) => ipcRenderer.invoke("lh:data-folder:apply", request),
+	},
 	onOpenSettings: (cb) => {
 		openSettingsListener = cb;
 		if (pendingOpenSettings !== null) {
