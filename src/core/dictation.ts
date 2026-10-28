@@ -88,3 +88,9 @@ export function deepgramListenUrl(language: DictationLanguage): string {
 		"&smart_format=true&punctuate=true&endpointing=300" +
 		`&language=${encodeURIComponent(language)}`;
 }
+
+/** FORK: the owner dictates with a system-wide tool (Wispr Flow), so the
+ * dictation UI is hidden: no composer bar, no Settings → Providers →
+ * Dictation group, no Mod+D binding. The code stays so upstream merges stay
+ * clean; flip this to bring it back. */
+export const DICTATION_UI = false;

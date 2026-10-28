@@ -12,6 +12,7 @@ import { SettingsDialogBody } from "../components/settings/settings-dialog.tsx";
 import { KeysSection } from "../components/settings/keys-section.tsx";
 import { ModelControl } from "../components/model-picker.tsx";
 import type { ChatGPTStatus, ChatGPTControlBridge } from "../src/core/index.ts";
+import { DICTATION_UI } from "../src/core/index.ts";
 import { completedWithin } from "./completion.ts";
 
 const dom = parseHTML("<html><body></body></html>");
@@ -84,8 +85,10 @@ test("Providers has exactly four ordered sections; unknown variables stay masked
  };
  fixture(); await mount(<KeysSection />);
  const headings = [...document.querySelectorAll('[data-testid^="group-"] > p')].map((el) => el.textContent);
- assert.deepEqual(headings, ["Model API keys", "Subscriptions", "Dictation", "Search"]);
- assert(byTest("key-deepgram_api_key").closest('[data-testid="group-dictation"]'));
+ // FORK: the Dictation group is hidden with the dictation UI (DICTATION_UI).
+ assert.deepEqual(headings, ["Model API keys", "Subscriptions", ...(DICTATION_UI ? ["Dictation"] : []), "Search"]);
+ if (DICTATION_UI) assert(byTest("key-deepgram_api_key").closest('[data-testid="group-dictation"]'));
+ else assert.equal(document.querySelector('[data-testid="key-deepgram_api_key"]'), null);
  assert(byTest("key-tavily_api_key").closest('[data-testid="group-search"]'));
  assert(byTest("key-brave_api_key").closest('[data-testid="group-search"]'));
  assert(byTest("unknown-FUTURE_VAR").closest('[data-testid="group-provider-keys"]'));

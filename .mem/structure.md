@@ -142,7 +142,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 ## External Interfaces
 - **HTTP API (`app/api`):** `chat` (POST turn); `chats` (list/create) and `chats/[id]` (read/rename/delete, `settings`, `steer`, `stream`, `dismiss`, `artifact-ui`, `markdown` export); `events` (SSE); `activity` + `activity/abort`; `jobs`; `graph` (snapshot, `status`, `costs`, `coverage/extract`, `import`, `nodes/[id]` DELETE, `positions`, `render-settings`); `keys`, `keys/[id]`; `models`; `search`; `settings`, `settings/[section]`, `settings/prompts`, `settings/prompts/[...segment]`; `stt/token`; `subscriptions`, `subscriptions/browser`.
 - `proxy.ts`: in desktop mode, 403s `/api/*` requests without the `x-learnharness-desktop` header matching `LH_DESKTOP_API_SECRET` (`server/desktop-access.ts`); no-op in browser mode.
-- **External services:** LLM providers through pi-ai (API keys in `auth.json` / `.env.local`, or subscription connections); Tavily/Brave web search (researcher); Deepgram STT (browser connects directly with a server-minted token).
+- **External services:** LLM providers through pi-ai (API keys in `auth.json` / `.env.local`, or subscription connections); Tavily/Brave web search (researcher); Deepgram STT (browser connects directly with a server-minted token; its UI is hidden in this fork by `DICTATION_UI` in `src/core/dictation.ts`).
 - **Filesystem:** `data/` (or `LH_DATA_DIR`), `auth.json` and `*-credentials.json` beside it (or `LH_AUTH_FILE`'s directory), `data/debug/provider-events/` when enabled.
 - `skills/learnharness/`: a Python skill that reads a LearnHarness data directory without the app (`references/data-format.md` documents the format).
 

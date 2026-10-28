@@ -19,10 +19,12 @@ import { Hint, hintText } from "../components/ui/hint.tsx";
 import { TOOLTIP_DELAY_MS } from "../components/ui/tooltip.tsx";
 import { AUTO_UPDATE_HINT } from "../components/settings/update-settings.tsx";
 import { IS_MAC } from "../src/core/keyboard.ts";
+import { DICTATION_UI } from "../src/core/dictation.ts";
 
 describe("hintText — the parenthesized composition", () => {
 	it("a registry action appends the LIVE binding (override-aware source)", () => {
-		assert.equal(hintText("Dictate", "toggle-dictation"), IS_MAC ? "Dictate (⌘D)" : "Dictate (Ctrl+D)");
+		// FORK: with the dictation UI hidden, Mod+D is unbound and the hint is the bare label.
+		assert.equal(hintText("Dictate", "toggle-dictation"), !DICTATION_UI ? "Dictate" : IS_MAC ? "Dictate (⌘D)" : "Dictate (Ctrl+D)");
 		assert.equal(hintText("Settings", "open-settings"), IS_MAC ? "Settings (⌘,)" : "Settings (Ctrl+,)");
 		assert.equal(hintText("Search sessions", "sessions-search"), IS_MAC ? "Search sessions (⌘⇧F)" : "Search sessions (Ctrl+Shift+F)");
 	});

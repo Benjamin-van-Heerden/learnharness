@@ -560,6 +560,7 @@ Every place the architecture is designed to be cut — the "one file" a future c
 | Data location (Electron) | `LH_DATA_DIR` env (`config.ts` PATHS) | where data/ lives, nothing else |
 | Desktop host | `electron/main.cjs` | launcher/security shell only |
 | Fork local build | `scripts/desktop-local.sh` + `lhLocalBuild` (`electron/main.cjs`) | how the fork's daily app is built, and that it never takes upstream's updates |
+| Fork dictation UI | `DICTATION_UI` (`src/core/dictation.ts`) | hides dictation in this fork: `DictationBar` renders nothing, Settings → Providers has no Dictation group, and Mod+D is unbound; the STT route and dictation code stay for clean upstream merges |
 
 ---
 

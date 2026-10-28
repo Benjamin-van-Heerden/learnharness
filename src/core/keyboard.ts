@@ -19,6 +19,8 @@
  * Order is fixed: mod, alt, shift, then the key.
  */
 
+import { DICTATION_UI } from "./dictation.ts";
+
 export type KeyAction =
 	| "toggle-dictation"
 	| "open-model-picker"
@@ -55,7 +57,7 @@ export interface KeyActionDef {
 }
 
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
-	{ id: "toggle-dictation", label: "Toggle dictation", scope: "global", binding: "mod+d" },
+	...(DICTATION_UI ? [{ id: "toggle-dictation", label: "Toggle dictation", scope: "global", binding: "mod+d" } as const] : []),
 	{ id: "open-settings", label: "Open settings", scope: "global", binding: "mod+," },
 	{ id: "open-model-picker", label: "Model selector", scope: "global", binding: "mod+k" },
 	{ id: "cycle-thinking", label: "Cycle thinking level", scope: "global", binding: "shift+tab" },

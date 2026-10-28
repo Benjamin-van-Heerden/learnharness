@@ -4,7 +4,7 @@ import { afterEach, test } from "node:test";
 import { parseHTML } from "linkedom";
 import { setDictationActive } from "../components/dictation-state.ts";
 import { notifySettingsSaved } from "../components/settings-signal.ts";
-import { AUTH_KEYS, DICTATION_LANGUAGES, type AuthKeyStatus, type ModelCatalogEntry, type UserSettings } from "../src/core/index.ts";
+import { AUTH_KEYS, DICTATION_LANGUAGES, DICTATION_UI, type AuthKeyStatus, type ModelCatalogEntry, type UserSettings } from "../src/core/index.ts";
 import { ModelMenuList } from "../components/settings/model-menu.tsx";
 
 let dispose: (() => Promise<void>) | undefined;
@@ -215,7 +215,8 @@ test("capture locks the row and dismisses an open language menu until capture en
 	assert(menu());
 });
 
-for (const source of ["none", "file", "env"] as const) test(`Language is below the full key row for ${source}-owned keys, including editing`, async () => {
+// FORK: these render the Settings Dictation group, which is hidden with the dictation UI.
+for (const source of ["none", "file", "env"] as const) test(`Language is below the full key row for ${source}-owned keys, including editing`, { skip: !DICTATION_UI && "dictation UI hidden in this fork" }, async () => {
 	const f = await fixture();
 	f.state.keys = [{
 		id: "DEEPGRAM_API_KEY", info: AUTH_KEYS.find((key) => key.id === "DEEPGRAM_API_KEY")!,
