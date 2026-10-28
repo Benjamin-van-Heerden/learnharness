@@ -50,6 +50,7 @@ const STORAGE_KEY = "lh:sidebar-open";
  */
 import type { ChatGPTControlBridge, NativeSubscriptionControlBridge } from "@/src/core";
 import type { UpdateState } from "@/components/settings/update-settings.tsx";
+import type { DataFolderBridge } from "@/components/settings/data-folder-settings.tsx";
 const SIDEBAR_AUTOCLOSE = 928;
 
 // Module scope, guarded for SSR (the server has no navigator).
@@ -77,6 +78,8 @@ declare global {
 			checkForUpdates?: () => Promise<void>;
 			installUpdate?: () => void;
 			onOpenSettings?: (cb: (section: string) => void) => () => void;
+			/** FORK: the choosable data folder (electron/data-folder.cjs). */
+			dataFolder?: DataFolderBridge;
 		};
 	}
 }

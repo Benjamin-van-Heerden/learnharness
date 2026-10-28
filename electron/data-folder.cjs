@@ -69,7 +69,9 @@ function registerDataFolderIPC(deps) {
 		if (!isTrusted(event)) throw new Error("Untrusted desktop request.");
 		if (!available) return { available: false };
 		const current = getDataDir();
-		return { available: true, path: current, isDefault: path.resolve(current) === defaultDataDir(userData), defaultPath: defaultDataDir(userData) };
+		const defaultPath = defaultDataDir(userData);
+		// defaultKind lets "Use default" say whether it moves or switches.
+		return { available: true, path: current, isDefault: path.resolve(current) === defaultPath, defaultPath, defaultKind: kindOf(current, defaultPath) };
 	});
 
 	ipcMain.handle("lh:data-folder:choose", async (event) => {

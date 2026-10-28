@@ -113,7 +113,7 @@ describe("data-folder IPC", () => {
 		const dataDir = path.join(userData, "data");
 		seed(dataDir);
 		const f = ipcFixture(userData, dataDir);
-		assert.deepEqual(await f.call("lh:data-folder:get"), { available: true, path: dataDir, isDefault: true, defaultPath: dataDir });
+		assert.deepEqual(await f.call("lh:data-folder:get"), { available: true, path: dataDir, isDefault: true, defaultPath: dataDir, defaultKind: "current" });
 		f.pick(undefined);
 		assert.deepEqual(await f.call("lh:data-folder:choose"), { canceled: true });
 		const empty = tmp("ipc-empty");

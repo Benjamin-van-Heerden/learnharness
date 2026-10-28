@@ -25,7 +25,7 @@
  *   check (including download/install-on-quit, even with automatic checks OFF).
  *
  *   window.lh.dataFolder — FORK: the choosable data folder (Settings →
- *   General). get() → {available, path, isDefault, defaultPath};
+ *   General). get() → {available, path, isDefault, defaultPath, defaultKind};
  *   choose() opens the native folder picker → {canceled} or {path, kind};
  *   apply({path, mode} | {reset: true}) stops the server, moves or adopts
  *   the data, and relaunches the app (electron/data-folder.cjs).
