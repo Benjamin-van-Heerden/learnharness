@@ -1,9 +1,10 @@
 ---
 title: Daily-driver desktop build and upstream tracking
-status: active
+status: completed
 assigned_to: benjamin_van_heerden
 created_at: "2026-10-27T12:04:45+02:00"
-updated_at: "2026-10-27T12:09:32+02:00"
+updated_at: "2026-10-28T13:52:16+02:00"
+completed_at: "2026-10-28T13:52:16+02:00"
 ---
 
 ## Overview
