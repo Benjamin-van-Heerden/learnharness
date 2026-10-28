@@ -4,12 +4,12 @@ This fork (`Benjamin-van-Heerden/learnharness`) is used daily as a desktop app o
 
 ## Branches
 
+mem runs in single-branch mode (`single_branch = true` in `.mem/config.toml`): there are no staging or production branches, and mem never promotes or tags. That matters here because the `release.yml` workflow inherited from upstream runs on any pushed `v*` tag.
+
 | Branch | Role |
 |---|---|
-| `main` | An exact mirror of upstream. Never committed to; the `upstream` onboard runnable fast-forwards it from upstream with `gh repo sync`. |
-| `dev` | Development. Upstream comes in here by merge commit. |
-| `test` | Staging (`mem promote staging`). |
-| `release` | Production (`mem promote production`). The daily app is built from this branch. |
+| `main` | An exact mirror of upstream (mem's `base`). Never committed to; the `upstream` onboard runnable fast-forwards it from upstream with `gh repo sync`. |
+| `dev` | The only working branch. Upstream comes in here by merge commit, and the daily app is built from it. |
 
 ## First install
 
@@ -17,7 +17,7 @@ This fork (`Benjamin-van-Heerden/learnharness`) is used daily as a desktop app o
 npm run desktop:local
 ```
 
-`scripts/desktop-local.sh` builds `origin/release` in a worktree beside the repo (`../learnharness-release`) and installs `/Applications/LearnHarness.app`:
+`scripts/desktop-local.sh` builds the pushed `origin/dev` in a worktree beside the repo (`../learnharness-build`) and installs `/Applications/LearnHarness.app`. Uncommitted or unpushed work in your checkout never reaches the installed app:
 
 - The first run creates the worktree and runs `npm ci` there (about 1 GB). Later runs reinstall dependencies only when `package-lock.json` changes.
 - It runs the same gates as `desktop:dist` (`next build`, the provider-runtime smoke, `build-server.mjs`, the server smoke under Electron's Node), then packages the `.app` with an ad-hoc signature and no notarization.
@@ -37,10 +37,9 @@ Local builds carry `lhLocalBuild: true` in their packaged `package.json`, so the
 
 ## Making a change
 
-1. Work on `dev` (commit as usual; `mem sync` pushes).
+1. Work on `dev` and commit as usual.
 2. Try it: `npm run dev` for the web app, or `npm run desktop:dev` for the desktop shell against the dev server. Both run beside the installed app; the dev shell uses its own `LearnHarness-dev` profile.
-3. When it's ready for daily use: `mem promote production` (optionally `mem promote staging` first).
-4. Rebuild: `npm run desktop:local`.
+3. When it's ready for daily use, push it (`mem sync`) and rebuild: `npm run desktop:local`.
 
 ## Taking upstream in
 
@@ -61,7 +60,7 @@ Then:
 1. Run `npm install` if `package-lock.json` changed.
 2. Run `npm run typecheck` and the tests related to the changed areas.
 3. Reconcile `docs/architecture.md`: it describes this fork's code, so neither side's version wins wholesale.
-4. Push `dev`, promote, and run `npm run desktop:local`.
+4. Push `dev` and run `npm run desktop:local`.
 
 Never rebase `dev` or force-push it, and never push to `upstream` (its push URL is disabled).
 

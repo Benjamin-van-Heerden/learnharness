@@ -3,7 +3,7 @@
 ## Overview
 LearnHarness is a learning app: a Next.js 16 (App Router) server and React UI, also packaged as an Electron desktop app. A teacher agent runs lessons as chat sessions. The first turns probe the learner (prober agent); after `probe_done` the teacher agent plans with `plan_init` and teaches with quiz/explain questions. Practice sessions run a separate practice agent. Teaching transcripts are extracted into a persistent knowledge graph of propositions and reasoning chains, which is the home page.
 
-This repository is a personal fork of `amosblomqvist/learnharness` (AGPL-3.0-only). `main` mirrors upstream exactly, `dev` is the development branch, `test` is staging and `release` is production (`.mem/config.toml`, `[git] base = 'main'`); the daily desktop app is built from `release`. The build, change and upstream-intake loop is in `docs/fork-workflow.md`; `docs/architecture.md` is the canonical architecture spec and describes this fork's code.
+This repository is a personal fork of `amosblomqvist/learnharness` (AGPL-3.0-only). `main` mirrors upstream exactly and `dev` is the only working branch: mem runs in single-branch mode (`.mem/config.toml`, `single_branch = true`, `base = 'main'`), so there are no staging or production branches and nothing is promoted or tagged. The daily desktop app is built from the pushed `dev`. The build, change and upstream-intake loop is in `docs/fork-workflow.md`; `docs/architecture.md` is the canonical architecture spec and describes this fork's code.
 
 ## Tech Stack
 - TypeScript (strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`), ES modules (`"type": "module"`); Electron main process files are CommonJS (`electron/*.cjs`).
@@ -126,7 +126,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - Web dev: `npm run dev` (http://localhost:3000). Production web: `npm run build` then `npm start`.
 - Desktop dev: `npm run desktop:dev` (Next dev + Electron pointed at it, `LH_DEV_URL`).
 - Desktop package: `electron/main.cjs` spawns `.next/standalone/server.js` on loopback. Upstream's signed/notarized build is `npm run desktop:dist` (needs upstream's Apple credentials).
-- Fork daily app: `npm run desktop:local` (`scripts/desktop-local.sh`) builds `origin/release` in the sibling worktree `../learnharness-release` (ad-hoc signed, not notarized, `lhLocalBuild` so the auto-updater is off) and installs `/Applications/LearnHarness.app`. Its data lives in `~/Library/Application Support/LearnHarness/`.
+- Fork daily app: `npm run desktop:local` (`scripts/desktop-local.sh`) builds `origin/dev` in the sibling worktree `../learnharness-build` (ad-hoc signed, not notarized, `lhLocalBuild` so the auto-updater is off) and installs `/Applications/LearnHarness.app`. Its data lives in `~/Library/Application Support/LearnHarness/`.
 - Fresh-user simulation: `npm run dev:fresh` (`scripts/dev-fresh.sh`, uses `.fresh-data/`).
 
 ## Commands and Workflows
@@ -137,7 +137,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - Python skill tests: `python3 -B -m unittest discover -s tests/skills -v`.
 - CI (`.github/workflows/ci.yml`, Node 26): typecheck, tests, lint; per-OS native renderer tests under Electron, build, and standalone smoke. `release.yml` builds desktop releases. Actions are disabled on this fork.
 - Upstream intake: the `upstream` runnable reports waiting releases at onboard; merge with `git fetch origin && git merge --no-ff origin/main` on `dev`, only when the user asks, then reconcile `docs/architecture.md` (see `docs/fork-workflow.md`).
-- Daily app: change on `dev` → `mem promote production` → `npm run desktop:local`.
+- Daily app: change on `dev` → push (`mem sync`) → `npm run desktop:local`.
 
 ## External Interfaces
 - **HTTP API (`app/api`):** `chat` (POST turn); `chats` (list/create) and `chats/[id]` (read/rename/delete, `settings`, `steer`, `stream`, `dismiss`, `artifact-ui`, `markdown` export); `events` (SSE); `activity` + `activity/abort`; `jobs`; `graph` (snapshot, `status`, `costs`, `coverage/extract`, `import`, `nodes/[id]` DELETE, `positions`, `render-settings`); `keys`, `keys/[id]`; `models`; `search`; `settings`, `settings/[section]`, `settings/prompts`, `settings/prompts/[...segment]`; `stt/token`; `subscriptions`, `subscriptions/browser`.

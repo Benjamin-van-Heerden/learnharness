@@ -12,12 +12,14 @@ Make this fork usable as the user's daily learning app on their own Mac, and kee
 
 Four parts:
 
-1. **Local desktop build.** One command builds the macOS app from the `release` branch and installs it as `/Applications/LearnHarness.app`. The build is ad-hoc signed, not notarized, and has auto-update switched off. Data lives in `~/Library/Application Support/LearnHarness/`, outside the repo, so tests and branch work never touch it.
+1. **Local desktop build.** One command builds the macOS app from the pushed `dev` branch and installs it as `/Applications/LearnHarness.app`. The build is ad-hoc signed, not notarized, and has auto-update switched off. Data lives in `~/Library/Application Support/LearnHarness/`, outside the repo, so tests and branch work never touch it.
 2. **Upstream watcher.** The onboard runnable `.mem/runnables/upstream` reports upstream releases and commits that `dev` hasn't merged. For each waiting release it prints the release notes, plus the changed files in risky areas, so new releases get a deliberate review before they are merged.
 3. **Architecture doc as ours.** `docs/architecture.md` describes this fork's code. It is brought in line with the code now. A project memory keeps it current with every change and with every upstream merge. A new onboard runnable prints its headings, so sessions know what it covers without reading all of it.
-4. **Workflow doc.** A short doc describes the build, use, change, promote, rebuild and upstream-intake loop.
+4. **Workflow doc.** A short doc describes the build, use, change, rebuild and upstream-intake loop.
 
 User decisions (2026-10-27): keep the name LearnHarness (no rename); auto-update off in fork builds; ad-hoc signing (dictation is not needed; the user uses superwhisper); the daily app is built from the `release` branch; `docs/architecture.md` is edited in place to describe our code, and conflicts with upstream's edits are resolved at merge time.
+
+Revised (2026-10-28): the repo moved to mem's single-branch mode (mem v0.11.0, `single_branch = true`). The `test` and `release` branches are deleted, and the daily app is built from the pushed `dev` in `../learnharness-build`. Promoting would have pushed a `v*` tag, which sets off the `release.yml` workflow inherited from upstream on this fork.
 
 ## Goals
 
@@ -37,9 +39,9 @@ User decisions (2026-10-27): keep the name LearnHarness (no rename); auto-update
 ### 2. Build-and-install script (`scripts/desktop-local.sh`, npm script `desktop:local`)
 
 - Bash, run from the main checkout: `npm run desktop:local`.
-- Maintains a persistent git worktree of the `release` branch at `../learnharness-release`, a sibling of the repo. It must not be inside the repo, or tsc, eslint and the Next tracer would pick it up.
+- Maintains a persistent git worktree of the pushed `dev` branch at `../learnharness-build`, a sibling of the repo. It must not be inside the repo, or tsc, eslint and the Next tracer would pick it up.
   - The first run creates it with `git worktree add`.
-  - Later runs `git fetch origin` and check out `origin/release` detached in the worktree. A dirty worktree makes the script stop with a message, never discard changes.
+  - Later runs `git fetch origin` and check out `origin/dev` detached in the worktree. A dirty worktree makes the script stop with a message, never discard changes.
 - Runs `npm ci` in the worktree on the first run, and again whenever `package-lock.json` differs from the last successful install (a stamp file in the worktree's `node_modules/`).
 - Build steps, the same gates as `desktop:dist` minus signing and notarization:
   1. `rm -rf dist .next/standalone`
@@ -101,11 +103,11 @@ Keep the current behaviour (`gh repo sync` of the fork's `main`, the count of `d
 
 A new file, not added to upstream's docs, so it never conflicts. Covers:
 
-- The branches: `main` mirrors upstream, `dev` is development, `release` is what the daily app is built from.
+- The branches: `main` mirrors upstream, `dev` is the only working branch and what the daily app is built from (single-branch mode).
 - First install with `npm run desktop:local`, then adding API keys in the app's Settings.
 - Where data lives (`~/Library/Application Support/LearnHarness/`) and that the build never touches it.
-- The loop: change on `dev`, `mem promote production`, `npm run desktop:local`.
-- Upstream intake: the onboard report, review, `git merge --no-ff origin/main`, the checks after a merge, promote, rebuild.
+- The loop: change on `dev`, push, `npm run desktop:local`.
+- Upstream intake: the onboard report, review, `git merge --no-ff origin/main`, the checks after a merge, push, rebuild.
 - That the app never updates itself.
 
 Link it from `.mem/structure.md`.
@@ -113,11 +115,11 @@ Link it from `.mem/structure.md`.
 ## Success Criteria
 
 - `electron/main.cjs` skips electron-updater when the packaged `package.json` has `lhLocalBuild: true`, and reports status `disabled`. `tests/automatic-updates.test.ts` covers this, and the existing cases pass.
-- `npm run desktop:local` builds `origin/release` in `../learnharness-release` and installs `/Applications/LearnHarness.app`.
+- `npm run desktop:local` builds `origin/dev` in `../learnharness-build` and installs `/Applications/LearnHarness.app`.
   - The installed app launches, opens a session, and Settings → General shows no update check controls.
   - `codesign -dv` on the app shows an ad-hoc signature.
   - Its data is under `~/Library/Application Support/LearnHarness/data`.
-- Running `npm run desktop:local` a second time after a change is promoted installs the new build. Sessions, keys and settings from the first install are still there.
+- Running `npm run desktop:local` a second time after a change is pushed installs the new build. Sessions, keys and settings from the first install are still there.
 - A failure in any build step leaves the installed app untouched.
 - `.mem/runnables/upstream` prints, for each upstream `v*` tag not in `dev`, the tag, date and release notes, plus risk-area file groups and an agent instruction when anything is waiting. With nothing waiting, it prints only the one-line summary.
 - `.mem/runnables/architecture` prints the headings of `docs/architecture.md` at onboard.
@@ -128,7 +130,7 @@ Link it from `.mem/structure.md`.
 
 ## Notes
 
-- **Order of operations:** the build script builds `release`, so the first real build needs this work promoted (`mem promote production`). Releases happen only when the user asks; the final task stops and asks for that.
+- **Order of operations:** the build script builds the pushed `dev`, so the first real build needs the single-branch switch pushed first.
 - `docs/development.md` (Layout, Key mechanisms) has the same kind of drift. It is out of scope unless the user asks.
 - The worktree's `node_modules` is about 1 GB. A full rebuild is expected to take a few minutes.
 - The Node version is 26 (CI uses 26; Node 22 breaks `electron/subscriptions.cjs`). The user's global asdf default is already 26.12.1.

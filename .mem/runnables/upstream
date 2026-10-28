@@ -64,5 +64,5 @@ notes above, including anything that touches our own changes. Recommend reviewin
 merge only when the user asks: `git fetch origin && git merge --no-ff origin/main` on dev, then `git push`.
 After a merge: run `npm install` if package-lock.json changed, `npm run typecheck`, and the tests related
 to the changed areas; reconcile docs/architecture.md with the merged code (it describes this fork). Then
-remind the user that the installed app only changes after `mem promote production` and `npm run desktop:local`.
+remind the user that the installed app only changes after `npm run desktop:local`, which builds the pushed dev.
 EOF

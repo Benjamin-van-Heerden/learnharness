@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# THE FORK'S DAILY-DRIVER BUILD: build the macOS app from the release
+# THE FORK'S DAILY-DRIVER BUILD: build the macOS app from the pushed dev
 # branch and install it as /Applications/LearnHarness.app
 # (docs/fork-workflow.md).
 #
 #   npm run desktop:local
 #
-# - Builds origin/release in a persistent worktree BESIDE the repo
-#   (../learnharness-release), never this checkout, so half-finished dev
-#   work never reaches the installed app. Inside the repo, tsc, eslint and
+# - Builds origin/dev in a persistent worktree BESIDE the repo
+#   (../learnharness-build), never this checkout, so uncommitted or
+#   unpushed work never reaches the installed app. Inside the repo, tsc, eslint and
 #   the Next tracer would pick the worktree up.
 # - The same gates as desktop:dist, minus Developer ID signing and
 #   notarization: an ad-hoc signature (identity "-"; left unset,
@@ -22,7 +22,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORKTREE="$(dirname "$ROOT")/learnharness-release"
+WORKTREE="$(dirname "$ROOT")/learnharness-build"
 APP_NAME="LearnHarness"
 INSTALLED="/Applications/$APP_NAME.app"
 LOCK_STAMP="node_modules/.desktop-local-lock"
@@ -34,17 +34,17 @@ fi
 
 step() { echo "── $* ──"; }
 
-step "release branch"
-git -C "$ROOT" fetch -q origin release
+step "dev branch"
+git -C "$ROOT" fetch -q origin dev
 if [ -d "$WORKTREE" ]; then
 	# Only tracked edits count as dirty: build output is git-ignored.
 	if [ -n "$(git -C "$WORKTREE" status --porcelain --untracked-files=no)" ]; then
 		echo "error: $WORKTREE has local edits; commit or discard them first" >&2
 		exit 1
 	fi
-	git -C "$WORKTREE" checkout -q --detach origin/release
+	git -C "$WORKTREE" checkout -q --detach origin/dev
 else
-	git -C "$ROOT" worktree add -q --detach "$WORKTREE" origin/release
+	git -C "$ROOT" worktree add -q --detach "$WORKTREE" origin/dev
 fi
 cd "$WORKTREE"
 echo "  building $(git log -1 --format='%h %s') ($(node -p 'require("./package.json").version'))"
