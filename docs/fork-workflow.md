@@ -27,7 +27,13 @@ Open the app and add your API keys (or connect a subscription) in Settings → P
 
 ## Where your data lives
 
-The installed app keeps everything in `~/Library/Application Support/LearnHarness/`: `data/` (sessions, graph ledgers, jobs, settings), `auth.json` (keys, mode 0600) and `logs/main.log`. Rebuilding and reinstalling never touches it.
+The installed app keeps everything in `~/Library/Application Support/LearnHarness/`: `data/` (sessions, graph ledgers, jobs, settings), `auth.json` (keys, mode 0600), the ChatGPT and subscription credential files, and `logs/main.log`. Rebuilding and reinstalling never touches it.
+
+**Choosing the data folder.** Settings → General → Data folder → **Choose…** moves `data/` to a folder you pick, for example in iCloud Drive. Pick an empty folder and LearnHarness copies everything, verifies every file, deletes the old copy and restarts; pick a folder that already holds LearnHarness data and it switches to it, leaving the current data where it is. **Use default** goes back to Application Support. Only the data moves: keys, credentials and logs stay in Application Support. The choice is stored in `data-location.json` there.
+
+- Use the folder on **one Mac at a time**. Two Macs writing to it while iCloud syncs can produce conflict copies; quit on one Mac and let it sync before opening the other.
+- In iCloud Drive, right-click the folder → **Keep Downloaded**, so macOS never evicts files the app needs.
+- If the folder is missing at launch (still syncing, drive unplugged), the app asks: Try Again, Choose Another Folder… or Quit. It never starts on a different folder by itself.
 
 Don't use `npm run dev` from the repo as a daily driver: in dev/web mode the app uses the repo's `data/`, which the test suite also writes to.
 

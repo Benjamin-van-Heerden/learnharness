@@ -402,7 +402,7 @@ Practice is strengthening, not assessment: nothing a practice session does reach
 ```mermaid
 flowchart LR
     subgraph DESKTOP["Electron app (production)"]
-        MAIN["Electron main (electron/main.cjs)<br/>launcher + credential/security owner<br/>origin-pinned controls · private child IPC"] -->|"spawn: ELECTRON_RUN_AS_NODE,<br/>loopback port, LH_DATA_DIR=userData/data"| NEXT["standalone Next server (child)<br/>ALL app logic: turns · extraction · jobs · graph"]
+        MAIN["Electron main (electron/main.cjs)<br/>launcher + credential/security owner<br/>origin-pinned controls · private child IPC"] -->|"spawn: ELECTRON_RUN_AS_NODE,<br/>loopback port, LH_DATA_DIR=the chosen data folder"| NEXT["standalone Next server (child)<br/>ALL app logic: turns · extraction · jobs · graph"]
         MAIN -->|"loadURL, sandboxed renderer"| REND["Browser renderer (components/)<br/>fetch/WebSocket to own origin only"]
     end
     subgraph OUTSIDE["outside the process"]
@@ -420,9 +420,9 @@ flowchart LR
     REND -->|"fetch /api/*"| NEXT
 ```
 
-The Electron main is a launcher + credential/security guard, never a host for teaching or inference logic: single-instance lock, deny-by-default permissions, origin-pinned navigation, sandboxed renderer. All Next.js code runs unchanged in a child process (`output: "standalone"`), relocated by the `LH_DATA_DIR` seam (also the test seam — `data-dir-seam.test.ts` covers it, including a fresh-child-process case). The build hard-fails if repo `data/` would leak into the bundle or if prompt assets fall out of the trace (`scripts/build-server.mjs`).
+The Electron main is a launcher + credential/security guard, never a host for teaching or inference logic: single-instance lock, deny-by-default permissions, origin-pinned navigation, sandboxed renderer. All Next.js code runs unchanged in a child process (`output: "standalone"`), relocated by the `LH_DATA_DIR` seam. **The data folder is the user's choice (fork)**: `electron/data-folder.cjs` resolves it once per launch from `<userData>/data-location.json` (absent = `<userData>/data`; `electron/data-location.cjs`), and a chosen folder that is missing or a corrupt setting stops startup with Try Again / Choose Another Folder… / Quit — never a fallback. Settings → General changes it over `lh:data-folder:get/choose/apply`: apply stops the server and waits for its exit, then moves (copy, SHA-256 verify, save the choice, delete the source) or adopts a folder that already holds data, and relaunches the app. Secrets (`auth.json`, ChatGPT and subscription credentials) and `logs/` stay in userData. The seam is also the test seam — `data-dir-seam.test.ts` covers it, including a fresh-child-process case). The build hard-fails if repo `data/` would leak into the bundle or if prompt assets fall out of the trace (`scripts/build-server.mjs`).
 
-`proxy.ts` guards `/api/*` in desktop mode: Electron main passes a per-launch `LH_DESKTOP_API_SECRET` to the server child, and requests must carry it as the `x-learnharness-desktop` header (`src/server/desktop-access.ts`); in browser mode the check is a no-op. Besides the server child's ChatGPT (`lh:chatgpt`) and subscription (`lh:subscriptions`) IPC channels, the renderer bridge (`electron/preload.cjs`) exposes zoom, window-expand, open-settings, update and subscription-control channels.
+`proxy.ts` guards `/api/*` in desktop mode: Electron main passes a per-launch `LH_DESKTOP_API_SECRET` to the server child, and requests must carry it as the `x-learnharness-desktop` header (`src/server/desktop-access.ts`); in browser mode the check is a no-op. Besides the server child's ChatGPT (`lh:chatgpt`) and subscription (`lh:subscriptions`) IPC channels, the renderer bridge (`electron/preload.cjs`) exposes zoom, window-expand, open-settings, update, subscription-control and data-folder channels.
 
 **Auto-update** (packaged builds only, `setupAutoUpdater` in `electron/main.cjs`): electron-updater reads upstream's GitHub Releases feed, checks at launch and every 24 hours unless `general.autoUpdate` is false (manual checks always run), downloads automatically and installs on quit. **Fork local builds never update**: `scripts/desktop-local.sh` stamps `lhLocalBuild: true` into the packaged `package.json` (electron-builder `extraMetadata`), and `setupAutoUpdater` then never loads electron-updater and reports status `disabled`, so Settings shows no update controls. The fork's daily app is rebuilt from the pushed `dev` branch instead ([fork-workflow.md](fork-workflow.md)).
 
@@ -560,6 +560,7 @@ Every place the architecture is designed to be cut — the "one file" a future c
 | Data location (Electron) | `LH_DATA_DIR` env (`config.ts` PATHS) | where data/ lives, nothing else |
 | Desktop host | `electron/main.cjs` | launcher/security shell only |
 | Fork local build | `scripts/desktop-local.sh` + `lhLocalBuild` (`electron/main.cjs`) | how the fork's daily app is built, and that it never takes upstream's updates |
+| Fork data folder | `electron/data-location.cjs` + `electron/data-folder.cjs`, `components/settings/data-folder-settings.tsx` | where the desktop app's data/ lives, and moving it safely |
 | Fork dictation UI | `DICTATION_UI` (`src/core/dictation.ts`) | hides dictation in this fork: `DictationBar` renders nothing, Settings → Providers has no Dictation group, and Mod+D is unbound; the STT route and dictation code stay for clean upstream merges |
 
 ---

@@ -111,7 +111,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - `artifacts/`: renderers for job results and tool cards.
 
 ### Electron (`electron/`)
-`main.cjs` (launcher and security shell; spawns the standalone server with `LH_DATA_DIR=<userData>/data` and `LH_AUTH_FILE`; auto-update), `preload.cjs`, `chatgpt.cjs` + `chatgpt-ipc.cjs` (ChatGPT OAuth), `subscriptions.cjs` + `subscription-ipc.cjs` + `subscription-store.cjs` (GitHub Copilot/xAI via the Pi SDK), `desktop-api.cjs` (per-launch secret header), `web-subscription-browser.cjs`, `browser-service-readiness.cjs`, `server-title-guard.cjs`.
+`main.cjs` (launcher and security shell; spawns the standalone server with `LH_DATA_DIR=<the chosen data folder>` and `LH_AUTH_FILE`; auto-update), `preload.cjs`, `data-location.cjs` + `data-folder.cjs` (fork: the choosable data folder — `<userData>/data-location.json`, verified moves, the missing-folder startup dialog, `lh:data-folder:*` IPC; UI in `components/settings/data-folder-settings.tsx`), `chatgpt.cjs` + `chatgpt-ipc.cjs` (ChatGPT OAuth), `subscriptions.cjs` + `subscription-ipc.cjs` + `subscription-store.cjs` (GitHub Copilot/xAI via the Pi SDK), `desktop-api.cjs` (per-launch secret header), `web-subscription-browser.cjs`, `browser-service-readiness.cjs`, `server-title-guard.cjs`.
 
 ## Data Flow
 - **Turn:** browser `POST /api/chat` → `handleChatRequest` → `parseChatInput` → model gate → `ensureCompacted` → write-ahead `chatStore.saveMessages` → `beginTurn` → build prober/teacher/practice agent from the record → `runPiTurn` streams SSE (clients can reattach via `GET /api/chats/[id]/stream`) → on finish `persistTurn`, `triggerExtraction` (not for practice), `applyParkedDismissal`, `kickCompaction`, `endTurn`.
@@ -126,7 +126,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - Web dev: `npm run dev` (http://localhost:3000). Production web: `npm run build` then `npm start`.
 - Desktop dev: `npm run desktop:dev` (Next dev + Electron pointed at it, `LH_DEV_URL`).
 - Desktop package: `electron/main.cjs` spawns `.next/standalone/server.js` on loopback. Upstream's signed/notarized build is `npm run desktop:dist` (needs upstream's Apple credentials).
-- Fork daily app: `npm run desktop:local` (`scripts/desktop-local.sh`) builds `origin/dev` in the sibling worktree `../learnharness-build` (ad-hoc signed, not notarized, `lhLocalBuild` so the auto-updater is off) and installs `/Applications/LearnHarness.app`. Its data lives in `~/Library/Application Support/LearnHarness/`.
+- Fork daily app: `npm run desktop:local` (`scripts/desktop-local.sh`) builds `origin/dev` in the sibling worktree `../learnharness-build` (ad-hoc signed, not notarized, `lhLocalBuild` so the auto-updater is off) and installs `/Applications/LearnHarness.app`. Its data lives in `~/Library/Application Support/LearnHarness/` unless moved in Settings → General → Data folder.
 - Fresh-user simulation: `npm run dev:fresh` (`scripts/dev-fresh.sh`, uses `.fresh-data/`).
 
 ## Commands and Workflows
