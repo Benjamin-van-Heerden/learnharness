@@ -1,9 +1,10 @@
 ---
 title: Choosable data folder
-status: active
+status: completed
 assigned_to: benjamin_van_heerden
 created_at: "2026-10-28T15:51:13+02:00"
-updated_at: "2026-10-28T15:54:14+02:00"
+updated_at: "2026-10-28T16:26:40+02:00"
+completed_at: "2026-10-28T16:26:40+02:00"
 ---
 
 ## Overview
