@@ -5,7 +5,6 @@ description = 'Personal fork of LearnHarness (amosblomqvist/learnharness), an ag
 [git]
 remote = 'origin'
 development = 'dev'
-staging = 'test'
-production = 'release'
+single_branch = true
 base = 'main'
 protect = true
