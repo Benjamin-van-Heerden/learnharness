@@ -92,11 +92,14 @@ Paths come from `config.ts` (`PATHS`, `LEDGER_FILES`, `SOURCES_FILE`, `POSITIONS
 - `events-stream.ts`: the `GET /api/events` SSE seam over `core/events.ts`.
 - `observability.ts`: the activity feed (running jobs, extraction, turns) and aborts.
 - `graph.ts`, `commit-positions.ts`, `chats.ts`, `keys.ts`, `search.ts` (Tavily/Brave status), `model-catalog.ts`, `pricing.ts`, `settings-body.ts`, `desktop-access.ts`.
+- `custom-provider.ts` (+ `-auth`, `-body`, `-http`): the one custom OpenAI-compatible endpoint, registered into `piModels()` (docs/custom-providers.md). `claude-code.ts` / `claude-code-config.ts`: Claude Code CLI installation status and config for Settings.
 - `web-subscriptions.ts` / `web-subscription-http.ts`: web/dev owner of subscription credentials (imports `electron/*.cjs` controllers directly) and its same-origin HTTP controls.
 
 ### Agent (`src/agent`)
 Dependencies arrive by factory arguments; never imports `server` or `store`.
 - `teacher-agent.ts`: `createProberAgent`, `createTeacherAgent`, `createPracticeAgent`; adds `send_to_user` only for Claude model ids.
+- `claude-code/`: the Claude Code CLI provider (launch, stream, tool bridge, transcript); opt-in, the CLI's own auth and billing.
+- `image-processing/`: bounded image resize/format handling (ported from pi) for read-tool images, PDF pages and visual-maker screenshots.
 - `models.ts`: `piEngineFor(role)`, `piEngineForSpec`, `PiEngine`; resolves engines from the settings model slots (strong/cheap/vision) and per-role/per-chat overrides; 503 `models_not_configured` when empty.
 - `prompt-segments.ts`: `composeInstructions(kind)` from `prompts/` plus user overrides.
 - `tools.ts`: `createTeacherTools` (quiz/explain, ask_user_question, read/ls/find/grep, plan_init, research/demo/visual/pdf) and `createProberTools` (probe/recall, ask_user_question, fs tools, research/pdf, gated list_sessions/list_propositions, probe_done). Question tools have no server execute; the browser answers them.
@@ -108,6 +111,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - `components/chat.tsx`, `session.ts`, `session-core.ts`: the session view and its client state; `question-dock.tsx` (quizzes), `practice-dock.tsx` + `practice-cards.tsx` (practice problems), `plan-window.tsx` / `plan-block.tsx`, `activity-dock.tsx`, `composer.tsx`, `dictation.tsx`.
 - `home.tsx`, `graph-view.tsx`, `graph-canvas.ts` (Canvas 2D renderer), `chain-table.tsx` (chain management and deletion), `notes-import.tsx`.
 - `server-events.tsx`: the single `EventSource` per window.
+- `file-path-drop-zone.tsx`, `path-input.tsx` (+ `path-input-dom.ts`), `file-path-chip.tsx`: desktop drag-and-drop of local file paths into drafts as quoted path chips (`src/core/file-paths.ts`); nothing is uploaded.
 - `artifacts/`: renderers for job results and tool cards.
 
 ### Electron (`electron/`)
