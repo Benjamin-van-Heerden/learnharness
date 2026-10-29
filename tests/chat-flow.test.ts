@@ -1003,7 +1003,7 @@ describe("renameChat (the header's click-to-edit title)", () => {
 		const chat = chatStore.createChat("old title");
 		createdChats.push(chat.id);
 		const before = chatStore.getChat(chat.id)!.updatedAt;
-		const renamed = chatStore.renameChat(chat.id, "  new title  ");
+		const renamed = chatStore.renameChat(chat.id, "  new title  ", "user");
 		assert.equal(renamed.title, "new title", "trimmed on the way in");
 		assert.equal(chatStore.getChat(chat.id)!.title, "new title");
 		assert.equal(
@@ -1021,7 +1021,7 @@ describe("renameChat (the header's click-to-edit title)", () => {
 	it("falls back to Untitled session on an all-whitespace title (the honest floor)", () => {
 		const chat = chatStore.createChat("keep me");
 		createdChats.push(chat.id);
-		const renamed = chatStore.renameChat(chat.id, "   ");
+		const renamed = chatStore.renameChat(chat.id, "   ", "user");
 		assert.equal(renamed.title, "Untitled session");
 	});
 });

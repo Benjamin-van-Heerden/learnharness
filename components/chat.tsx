@@ -343,6 +343,12 @@ export function Chat({
 		return () => window.removeEventListener("lh:chat-renamed", onRenamed);
 	}, [chatId]);
 
+	// FORK (UI rework): the titler's summary usually lands mid-first-turn,
+	// when record-changed is ignored, so it carries the title itself.
+	useServerEvent("chat-titled", (p) => {
+		if (p.chatId === chatId) setTitleText(p.title);
+	});
+
 	// The Esc chain's last link: abort the turn. The background runner
 	// decoupled turns from views, so the abort is ALWAYS the remote kill
 	// (POST /api/activity/abort — any in-flight turn dies server-side, our

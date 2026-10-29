@@ -36,7 +36,7 @@ describe("chat store events (S6: the silence law)", () => {
 		const chat = chatStore.createChat("Store events fixture");
 		assert.equal(announces, 1, "create announces post-write");
 
-		chatStore.renameChat(chat.id, "Renamed");
+		chatStore.renameChat(chat.id, "Renamed", "user");
 		assert.equal(announces, 2, "rename announces (a list-shape write)");
 
 		assert.equal(chatStore.deleteChat(chat.id), true);

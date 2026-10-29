@@ -48,6 +48,7 @@ import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-ser
 import { hasProbeDone, danglingQuestionOf } from "../core/native-messages.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
+import { titleSession } from "./session-title.ts";
 import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
 import { emit } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
@@ -153,6 +154,22 @@ function resolveEngine(role: ModelRole): PiEngine | undefined {
 }
 
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
+
+/** FORK (UI rework): name a fresh session in the background on the titler
+ *  role (role override → cheap slot). Fire-and-forget: an unresolved role,
+ *  a missing key, or a subscription without background consent simply
+ *  keeps the prompt title. */
+export function titleSessionInBackground(chatId: string, prompt: string): void {
+	let engine: PiEngine | undefined;
+	try {
+		engine = resolveEngine("titler");
+	} catch {
+		return;
+	}
+	const provider = engine?.model.provider;
+	if (!engine || !provider || !providerKeyPresent(provider) || !connectionBackgroundAllowed(provider)) return;
+	void titleSession(chatId, prompt, { chatStore: stores.chatStore, engine });
+}
 
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(

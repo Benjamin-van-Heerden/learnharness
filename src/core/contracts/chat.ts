@@ -27,6 +27,11 @@ import type { EmissionStats } from "./graph.ts";
  *  practice agent, its two tools, no extraction, no graph writes. */
 export type ChatKind = "teach" | "practice";
 
+/** FORK (UI rework): who wrote a session's title. "prompt" = the truncated
+ *  opening prompt (also what absence reads as), "model" = the titler role,
+ *  "user" = a hand rename. The titler only ever replaces a "prompt" title. */
+export type TitleSource = "prompt" | "model" | "user";
+
 export interface ChatRecord {
 	id: string;
 	title: string;
@@ -35,6 +40,8 @@ export interface ChatRecord {
 	messages: LhMessage[];
 	/** The session's kind — absent = teach (pre-practice records). */
 	kind?: ChatKind;
+	/** Who wrote the title — absent = "prompt" (see TitleSource). */
+	titleSource?: TitleSource;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
 	/** Append-only usage log (observability, 2026-09): one entry per model

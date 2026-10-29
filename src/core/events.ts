@@ -50,6 +50,11 @@ export interface ServerEvents {
 	 *  the chat; the client mirrors it by disabling the composer/dock
 	 *  submit. */
 	"compaction-changed": { chatId: string; running: boolean };
+	/** FORK (UI rework): the titler named a session. chats-changed (from the
+	 *  rename write) refreshes the list; this carries the title to an open
+	 *  header, which must update even mid-turn (record-changed is ignored
+	 *  while a turn owns the view). */
+	"chat-titled": { chatId: string; title: string };
 }
 
 export type ServerEventType = keyof ServerEvents;
@@ -66,6 +71,7 @@ export const SERVER_EVENT_TYPES = [
 	"subscriptions-changed",
 	"record-changed",
 	"compaction-changed",
+	"chat-titled",
 ] as const satisfies readonly ServerEventType[];
 
 /** One notification: the type discriminates the payload. */

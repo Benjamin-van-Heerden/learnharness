@@ -41,7 +41,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 		return Response.json({ error: "title must be a non-empty string" }, { status: 400 });
 	}
 	const title = body.title.trim();
-	const record = stores.chatStore.renameChat(id, title);
+	const record = stores.chatStore.renameChat(id, title, "user");
 	return Response.json({ title: record.title });
 }
 

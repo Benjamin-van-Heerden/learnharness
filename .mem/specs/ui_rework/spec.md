@@ -29,7 +29,7 @@ The look is borrowed from the user's studii-next app (`~/Documents/Studii/studii
 - **Palette:** GitHub Dark (default) as the built-in palette, with no preset picker. Use the blue accent.
 - **Other visual changes:** none for now.
 - **Title font:** JetBrains Mono everywhere `font-title` is used. Drop the serif toggle.
-- **Auto-titles:** written from the first message, by a new `titler` role on the cheap slot that is configurable in Agent settings. Short sentence-case noun phrase.
+- **Auto-titles:** written from the first message, by a new `titler` role on the cheap slot. Short sentence-case noun phrase. Revised during implementation: Agent settings shows only the three slots (upstream removed the per-role rows), so the titler is named in the Cheap slot's roster hint, with a per-role override possible in settings.json like every other role (user, 2026-10-29).
 - **Working indicators:** fix all three gaps: between steps, hidden reasoning, and tools running.
 
 ## Technical Approach
@@ -91,20 +91,20 @@ Replace the remaining hard-coded `#141414` with `#0d1117`: `components/confidenc
 
 - **Role:**
   - add `"titler"` to `ModelRole` (`config.ts`) and `BACKGROUND_MODEL_ROLES` (`src/core/settings.ts`), with `ROLE_SLOT.titler = "cheap"`;
-  - the Agent settings role list picks it up from the array. Label it "Session titles".
+  - the Cheap slot's roster hint in Agent settings mentions naming sessions (there are no per-role rows).
   - update the tests that pin the role set.
 - **Persisting:** add `titleSource?: "prompt" | "model" | "user"` to the chat record (`src/core/contracts/chat.ts`).
   - Creation writes `"prompt"`; absence also means `"prompt"`, so no migration is needed.
   - The rename route `PUT /api/chats/[id]` writes `"user"`.
 - **When:** in `POST /api/chats` (`app/api/chats/route.ts`), after `createChat`, fire and forget `generateTitle(chat.id, fullPrompt)`. It must never block or fail the create.
   - `fullPrompt` is the untruncated `body.title`.
-  - Skip it when the body has no prompt ("Untitled session"), and for practice sessions, which have fixed titles. Confirm during implementation what practice sessions title themselves.
+  - Skip it when the body has no prompt ("Untitled session"). Practice sessions are titled from their opening text just like teach sessions (checked during implementation), so they get model titles too.
 - **The call:** a new `src/server/session-title.ts` resolves the `titler` engine the way other background roles do (role override, then cheap slot).
   - Reuse `runSubagent` with no tools, or the lightest existing one-shot path. Follow how `src/server/compaction.ts` runs its summary.
   - Prompt: write a 3–6 word sentence-case noun phrase naming the topic, with no quotes and no trailing punctuation. Output only the title. Pass the prompt as the user message, capped at about 4,000 characters.
   - Sanitize the reply (one line, quotes stripped), then run it through `titleFromPrompt`'s length cap.
   - Record usage and cost like other background calls, if that is how the role plumbing works.
-- **Write-back:** re-read the chat. If `titleSource` is still `"prompt"`, set the title and `titleSource: "model"`, then emit `chats-changed` (and `record-changed` for that chat) so the sidebar and the open header update.
+- **Write-back:** re-read the chat. If `titleSource` is still `"prompt"`, set the title and `titleSource: "model"`, the rename emits `chats-changed` for the sidebar, and a new `chat-titled {chatId, title}` event updates an open header. `record-changed` couldn't do this, because the header ignores it mid-turn, which is exactly when the title arrives.
 - **Failure:** no cheap model configured, a provider error, or an empty reply all leave the prompt title and log at debug/info. Nothing reaches the user.
 
 ### 6. Working indicators (`components/chat.tsx`, `components/ai-elements/reasoning.tsx`, the live tool card)
@@ -132,7 +132,7 @@ Replace the remaining hard-coded `#141414` with `#0d1117`: `components/confidenc
 - The `--radius*` tokens are `0`. `globals.css` has no literal `border-radius` other than `9999px`/`rounded-full` uses. `buttonVariants` applies `chamfer-sm`.
 - The `bg-hatch` utility exists and is applied to the app shell. The hatch shows behind the chat transcript as well.
 - `font-title` resolves to JetBrains Mono. `sessionNameSerif`, the serif row in Appearance, the CMU `@font-face` and `cmunbx.ttf` are gone, and settings files that still contain `sessionNameSerif` load without error.
-- `BACKGROUND_MODEL_ROLES` contains `titler` with `ROLE_SLOT.titler === "cheap"`. Agent settings lists "Session titles".
+- `BACKGROUND_MODEL_ROLES` contains `titler` with `ROLE_SLOT.titler === "cheap"`. The Cheap slot's roster hint mentions naming sessions.
 - `POST /api/chats` with a prompt returns at once with the truncated title. A test with a fake titler engine shows the title replaced by the model's sanitized phrase and `titleSource: "model"`, and a `chats-changed` event emitted.
 - Renaming sets `titleSource: "user"`. A model title arriving after a rename does not overwrite it (tested). With no cheap model, the prompt title stays and nothing throws (tested).
 - During a running turn, a render test shows the "Working…" line when the last part is a settled tool or a finished reasoning part, and shows it absent while text streams.
