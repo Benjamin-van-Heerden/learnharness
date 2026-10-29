@@ -1,9 +1,10 @@
 ---
 title: UI rework
-status: active
+status: completed
 assigned_to: benjamin_van_heerden
 created_at: "2026-10-29T13:26:09+02:00"
-updated_at: "2026-10-29T13:31:40+02:00"
+updated_at: "2026-10-29T13:52:20+02:00"
+completed_at: "2026-10-29T13:52:20+02:00"
 ---
 
 ## Overview
