@@ -506,7 +506,7 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	dictation: { language: "en" },
 	appearance: {
 		mode: "dark",
-		background: null, // the dark default (#141414) lives in the mode's derivation curve
+		background: null, // the dark default (#0d1117) lives in the mode's derivation curve
 		fontFamily: null, // Source Sans 3
 		proseFontSize: 16,
 		sessionNameSerif: true,

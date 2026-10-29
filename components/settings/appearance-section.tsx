@@ -193,12 +193,12 @@ export function AppearanceSection({
 			</SettingsRow>
 			<SettingsRow
 				label="Background"
-				hint={`Empty = ${resolved.background ?? "#141414"}`}
+				hint={`Empty = ${resolved.background ?? "#0d1117"}`}
 				testid="row-background"
 			>
 				<CommitInput
 					value={appearance?.background ?? ""}
-					placeholder="#141414"
+					placeholder="#0d1117"
 					ariaLabel="background hex"
 					testid="input-background"
 					onCommit={(v) => onSectionChange({ ...appearance, background: v === "" ? null : v })}

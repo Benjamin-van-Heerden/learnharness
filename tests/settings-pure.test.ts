@@ -42,30 +42,29 @@ describe("resolveAppearance — delta over factory", () => {
 	});
 });
 
-describe("derivedPalette — the dark curve keeps today's relationships", () => {
-	it("the factory background reproduces today's palette EXACTLY", () => {
-		assert.deepEqual(derivedPalette("#141414"), {
-			"--background": "#141414",
-			"--card": "#1c1c1c",
-			"--popover": "#1c1c1c",
-			"--secondary": "#1c1c1c",
-			"--muted": "#1c1c1c",
-			"--accent": "#2a2a2a",
-			"--border": "#434343",
-			"--input": "#434343",
-			"--primary-foreground": "#141414",
+describe("derivedPalette — the dark curve keeps the GitHub Dark relationships", () => {
+	it("the factory background lands on (or within a step of) the GitHub Dark ladder, and leaves the primary's text alone", () => {
+		assert.deepEqual(derivedPalette("#0d1117"), {
+			"--background": "#0d1117",
+			"--card": "#171b21",
+			"--popover": "#171b21",
+			"--secondary": "#171b21",
+			"--muted": "#171b21",
+			"--accent": "#22262c",
+			"--border": "#31353b",
+			"--input": "#31353b",
 		});
 	});
 
 	it("an off-factory background shifts every surface with it (clamped at 255)", () => {
 		const p = derivedPalette("#f0f0f0");
 		assert.equal(p["--background"], "#f0f0f0");
-		assert.equal(p["--card"], "#f8f8f8"); // 240 + 8 per channel
-		assert.equal(p["--border"], "#ffffff", "240 + 47 clamps to 255 on every channel");
+		assert.equal(p["--card"], "#fafafa"); // 240 + 10 per channel
+		assert.equal(p["--border"], "#ffffff", "240 + 36 clamps to 255 on every channel");
 	});
 
 	it("3-digit hex expands", () => {
-		assert.equal(derivedPalette("#abc")["--card"], "#b2c3d4"); // aa bb cc each +8
+		assert.equal(derivedPalette("#abc")["--card"], "#b4c5d6"); // aa bb cc each +10
 	});
 });
 
@@ -91,7 +90,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 			}),
 		);
 		assert.equal(vars["--background"], "#101820");
-		assert.equal(vars["--card"], "#182028", "raised +8 per channel: 10→18, 18→20, 20→28");
+		assert.equal(vars["--card"], "#1a222a", "raised +10 per channel: 10→1a, 18→22, 20→2a");
 		assert.equal(vars["--font-prose"], `"Georgia", var(--font-sans3), ui-sans-serif, system-ui, sans-serif`);
 		assert.equal(vars["--lh-prose-size"], "18px");
 		assert.equal(vars["--font-title"], "var(--font-prose)", "serif off → titles follow the prose font");

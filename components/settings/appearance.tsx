@@ -39,10 +39,11 @@ export function resolveAppearance(delta: AppearanceSettings | undefined) {
 	};
 }
 
-/** One channel clamped on the dark curve: additive offsets matching today's
- *  hand-picked palette (#141414 → card #1c1c1c (+8) → accent #2a2a2a (+22)
- *  → border #434343 (+47)) — the "per-mode derivation in code" the schema
- *  promises, as the thinnest curve that keeps the palette's relationships. */
+/** One channel clamped on the dark curve: additive offsets approximating
+ *  the GitHub Dark ladder (#0d1117 → card #161b22 (~+10) → accent #21262d
+ *  (~+21) → border #30363d (~+36); FORK, UI rework) — the "per-mode
+ *  derivation in code" the schema promises, as the thinnest curve that
+ *  keeps the palette's relationships. */
 function raise(hex: string, add: number): string {
 	const n = hex.length === 4
 		? hex.slice(1).split("").map((c) => parseInt(c + c, 16))
@@ -51,13 +52,14 @@ function raise(hex: string, add: number): string {
 }
 
 /** The derived palette a chosen background implies (dark curve): background
- *  itself, the raised surfaces (card/popover/secondary/muted, +8), the
- *  accent (+22), the edges (border/input, +47), and primary-foreground
- *  (the inverted text on primary = the background's own color, as today). */
+ *  itself, the raised surfaces (card/popover/secondary/muted, +10), the
+ *  accent (+21) and the edges (border/input, +36). primary-foreground is
+ *  NOT derived: the primary is the blue accent, whose text stays white
+ *  whatever the background. */
 export function derivedPalette(background: string): Record<string, string> {
-	const card = raise(background, 8);
-	const accent = raise(background, 22);
-	const border = raise(background, 47);
+	const card = raise(background, 10);
+	const accent = raise(background, 21);
+	const border = raise(background, 36);
 	return {
 		"--background": background,
 		"--card": card,
@@ -67,7 +69,6 @@ export function derivedPalette(background: string): Record<string, string> {
 		"--accent": accent,
 		"--border": border,
 		"--input": border,
-		"--primary-foreground": background,
 	};
 }
 
