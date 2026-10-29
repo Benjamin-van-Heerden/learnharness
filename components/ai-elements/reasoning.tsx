@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
+import { useElapsedSeconds } from "@/components/elapsed-seconds";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -149,6 +150,10 @@ export const ReasoningTrigger = memo(
     ...props
   }: ReasoningTriggerProps) => {
     const { isStreaming, isOpen } = useReasoning();
+    // A live tick while thinking (FORK, UI rework) — models that hide their
+    // reasoning show an empty row, so the count is the progress. Settled rows
+    // keep the static label (upstream: durations die on remount).
+    const elapsed = useElapsedSeconds(isStreaming);
 
     return (
       <CollapsibleTrigger
@@ -177,6 +182,9 @@ export const ReasoningTrigger = memo(
                 states must be visually seamless, one size everywhere. */}
             {isStreaming && <BrailleSpinner label="Thinking" />}
             {getThinkingMessage(isStreaming)}
+            {isStreaming && elapsed > 0 && (
+              <span className="normal-case tabular-nums" data-testid="thinking-elapsed">{elapsed}s</span>
+            )}
             <ChevronDownIcon
               className={cn(
                 "size-4 transition-transform",

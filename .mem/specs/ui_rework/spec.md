@@ -115,6 +115,11 @@ Replace the remaining hard-coded `#141414` with `#0d1117`: `components/confidenc
 - **Hidden reasoning:** a reasoning part with empty text that is still streaming keeps an animated trigger ("Thinking" shimmer) with elapsed seconds (`Thinking · 12s`). Once done it collapses to "Thought for 12s". Check what `ReasoningTrigger` already does with duration, and extend it rather than add a second timer.
 - **Tools running:** find which tool states render a static card while executing. Today's `LiveToolCard` covers `input-streaming`. Check `input-available` (executing, before output), job-dispatch parts and provider-side tools (web search). Keep them animated with an elapsed timer until the output lands.
 - Reproduce each gap first with a ChatGPT-subscription session, or a recorded provider stream under `debug/`, so the fix is checked against a real stream.
+- **As built (2026-10-29):**
+  - **No live stream was available** (no recordings, and the dev data has no models), so the gaps were traced in `session-core.ts` and `view.ts` and pinned with a session-model test that drives a real tool step.
+  - **Tool cards already animate while executing:** `input-streaming` lasts until `tool_execution_end`, so the change there is only the elapsed timer.
+  - **The real quiet stretch:** from a tool settling, or a message ending, until the next `message_start`. A new `messageStreaming` flag on the session state, plus `components/working-line.ts`, decide when "WORKING…" shows.
+  - **A finished thinking row keeps upstream's static "Agent's thinking"** (user ruling: live timer only).
 
 ### 7. Docs and install
 

@@ -18,6 +18,7 @@ import { PathText } from "@/components/file-path-chip";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { BrailleSpinner } from "@/components/braille-spinner";
+import { showWorkingLine } from "@/components/working-line";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
 import { Separator } from "@/components/ui/separator";
 import { AnsweredCard } from "@/components/answered-card";
@@ -255,7 +256,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send, continueIfOwed, steer, steerQueue, submitAnswer, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send, continueIfOwed, steer, steerQueue, submitAnswer, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, messageStreaming, error, stop, clearError, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
@@ -1655,6 +1656,15 @@ export function Chat({
 									<Shimmer duration={1}>
 										THINKING…
 									</Shimmer>
+								</span>
+							)}
+							{/* FORK (UI rework): the quiet stretch between steps — a tool
+							    settled or a message ended, the next has not started. Same
+							    register as THINKING…, exclusive with it by construction. */}
+							{showWorkingLine({ status, turnInFlight, compacting, messageStreaming, messages }) && (
+								<span data-testid="working-line" className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
+									<BrailleSpinner label="Working" />
+									<Shimmer duration={1}>WORKING…</Shimmer>
 								</span>
 							)}
 							{openingError && <p role="alert" className="text-sm text-destructive">{OPENING_PROMPT_FAILURE}</p>}

@@ -22,6 +22,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { absorbed, pendingCallTool, SessionModel } from "../components/session-core.ts";
+import { showWorkingLine } from "../components/working-line.ts";
 import type { ChatInput } from "../src/core/input-events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { newUserMessage, newAnswerResult, newThinkingMessage, needsContinuation, endsInDismissal, pendingQuestionOf } from "../src/core/native-messages.ts";
@@ -1765,5 +1766,61 @@ describe("absorbed — the custom role (the doubled thinking card)", () => {
 		const customs = m.getState().nativeMessages.filter((x) => (x as { role?: string }).role === "custom");
 		assert.equal(customs.length, 1, "the server copy replaced the optimistic one — no doubling");
 		assert.equal((customs[0] as { id?: string }).id, "srv_1");
+	});
+});
+
+// ─── FORK (UI rework): the working line across a real tool step ──────────────
+
+describe("the working line (nothing on screen moves between steps)", () => {
+	it("shows only between a settled tool and the next message", async () => {
+		let push: (e: unknown) => void = () => {};
+		const enc = new TextEncoder();
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				push = (e) => controller.enqueue(enc.encode(e === "[DONE]" ? "data: [DONE]\n\n" : `data: ${JSON.stringify(e)}\n\n`));
+			},
+		});
+		globalThis.fetch = dietFetch({ userText: "go", stream: () => new Response(body, { status: 200 }) });
+		const m = model();
+		const done = m.send({ type: "text", text: "go" });
+		const settle = () => new Promise((r) => setTimeout(r, 0));
+		const working = () => {
+			const s = m.getState();
+			return showWorkingLine({ status: s.status, turnInFlight: false, compacting: false, messageStreaming: s.messageStreaming, messages: s.messages });
+		};
+		const call = { type: "toolCall", id: "call_1", name: "read", arguments: { path: "notes.md" } };
+
+		push({ type: "message_start", message: { role: "assistant", content: [] } });
+		await settle();
+		assert.equal(working(), false, "a streaming message is already moving");
+
+		push({ type: "message_end", message: { role: "assistant", content: [call], stopReason: "toolUse" } });
+		await settle();
+		assert.equal(m.getState().messageStreaming, false, "the end's own snapshot reads the slot as closed");
+		assert.equal(working(), false, "the executing call's live card is moving");
+
+		push({ type: "tool_execution_end", toolCallId: "call_1", isError: false, result: { content: [{ type: "text", text: "ok" }], details: { path: "notes.md" } } });
+		await settle();
+		assert.equal(working(), true, "tool settled, next message not started: the quiet gap");
+
+		push({ type: "message_start", message: { role: "assistant", content: [] } });
+		await settle();
+		assert.equal(working(), false, "the next message's thinking row takes over");
+
+		push({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" } });
+		push({ type: "agent_end", messages: [] });
+		push("[DONE]");
+		await done;
+		assert.equal(working(), false, "a settled turn shows nothing");
+	});
+
+	it("never doubles the THINKING placeholder or the compaction line", () => {
+		const messages = [{ id: "a", role: "assistant" as const, parts: [{ type: "tool-read", state: "output-available" }] }];
+		const base = { status: "streaming", turnInFlight: false, compacting: false, messageStreaming: false, messages };
+		assert.equal(showWorkingLine(base), true);
+		assert.equal(showWorkingLine({ ...base, status: "submitted" }), false);
+		assert.equal(showWorkingLine({ ...base, turnInFlight: true }), false);
+		assert.equal(showWorkingLine({ ...base, compacting: true }), false);
+		assert.equal(showWorkingLine({ ...base, messages: [{ ...messages[0]!, parts: [{ type: "reasoning", text: "" }] }] }), false);
 	});
 });

@@ -185,6 +185,9 @@ export interface SessionState {
 	/** Completed conversation usage; null after compaction or before first usage. */
 	contextTokens: number | null;
 	status: SessionStatus;
+	/** FORK (UI rework): an assistant message is between its start and end
+	 *  right now — the working line's "something is already moving" signal. */
+	messageStreaming: boolean;
 	error: { message: string } | null;
 	/** Steers sent but not yet drained (composer steering, 2026-10-03):
 	 *  the queued indicator's truth. An entry dies when its id lands in
@@ -307,6 +310,7 @@ export class SessionModel {
 			hasConfirmedConversation: this.base.some(m => m.role === "user" || m.role === "assistant"),
 			contextTokens: measuredContextTokens(messages, this.incompleteUsageIds),
 			status: this.statusValue,
+			messageStreaming: this.streamingMessageId !== null,
 			error: this.errorValue ?? providerError,
 			steerQueue: this.steerQueueValue,
 		};
@@ -437,13 +441,13 @@ export class SessionModel {
 						this.tail = [...this.tail, withId];
 					});
 				} else {
+					// Slot done — next start mints fresh. Cleared BEFORE the notify
+					// so the end's snapshot already reads messageStreaming: false.
+					if (agent.type === "message_end") this.streamingMessageId = null;
 					this.mutate(() => {
 						const idx = this.tail.findIndex((m) => m.id === id);
 						this.tail = idx === -1 ? [...this.tail, withId] : this.tail.with(idx, withId);
 					});
-				}
-				if (agent.type === "message_end") {
-					this.streamingMessageId = null; // slot done — next start mints fresh
 				}
 				return true; // a message event is view work, even empty content
 			}

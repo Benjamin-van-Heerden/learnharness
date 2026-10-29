@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { toolActivityLabel } from "@/src/core";
+import { useElapsedSeconds } from "@/components/elapsed-seconds";
 import type { ArtifactPartProps } from "@/src/core";
 
 /**
@@ -39,6 +40,9 @@ export function LiveToolCard({ part }: ArtifactPartProps) {
 	else if (typeof inp.session === "string" && inp.session) arg = inp.session;
 
 	const hasInput = p.input != null && Object.keys(inp).length > 0;
+	// The card mounts only while the call is live (writing or executing), so
+	// its lifetime is the run (FORK, UI rework).
+	const elapsed = useElapsedSeconds(true);
 
 	return (
 		<details
@@ -52,6 +56,7 @@ export function LiveToolCard({ part }: ArtifactPartProps) {
 					{toolActivityLabel(tool)}
 				</Shimmer>
 				{arg && <span className="truncate">{arg}</span>}
+				{elapsed > 0 && <span className="shrink-0 tabular-nums" data-testid="live-tool-elapsed">{elapsed}s</span>}
 				<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" />
 			</summary>
 			<div className="mt-2 rounded-xl border bg-card p-3 text-xs">
