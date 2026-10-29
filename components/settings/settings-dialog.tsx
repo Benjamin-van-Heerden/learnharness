@@ -273,7 +273,7 @@ export function SettingsDialogBody({
 		>
 			{/* Header — the app's quiet CMU title language. */}
 			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-				<h2 className="font-title text-2xl tracking-tight">Settings</h2>
+				<h2 className="font-title text-2xl font-semibold tracking-tight">Settings</h2>
 				<Hint
 						// Esc closes the dialog (its own listener) — surface it.
 						label="Close"

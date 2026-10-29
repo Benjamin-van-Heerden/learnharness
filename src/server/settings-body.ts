@@ -220,7 +220,7 @@ function parseHexOrNull(value: unknown, field: string): { color?: string | null;
 }
 
 /** appearance: { mode?, background?, fontFamily?, proseFontSize?,
- *  sessionNameSerif?, mdRendering? } */
+ *  mdRendering? } */
 export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<AppearanceSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -252,12 +252,6 @@ export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<A
 			return { ok: false, error: "proseFontSize must be an integer between 12 and 24" };
 		}
 		settings.proseFontSize = raw.proseFontSize;
-	}
-	if (raw.sessionNameSerif !== undefined) {
-		if (typeof raw.sessionNameSerif !== "boolean") {
-			return { ok: false, error: "sessionNameSerif must be a boolean" };
-		}
-		settings.sessionNameSerif = raw.sessionNameSerif;
 	}
 	if (raw.mdRendering !== undefined) {
 		const md = asRecord(raw.mdRendering);

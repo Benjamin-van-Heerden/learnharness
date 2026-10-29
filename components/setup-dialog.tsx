@@ -33,7 +33,7 @@
  * Closable without configuring (Esc/backdrop/✕) — browsing the app stays
  * possible; the GATE is the send interception, not the dialog. The
  * settings-dialog visual language: dim backdrop, border rounded-md card,
- * CMU title, z-50.
+ * mono title, z-50.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -459,7 +459,7 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 				onClick={(e) => e.stopPropagation()}
 			>
 				<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-					<h2 className="font-title text-2xl tracking-tight">Set up your models</h2>
+					<h2 className="font-title text-2xl font-semibold tracking-tight">Set up your models</h2>
 					<Hint label="Close" binding="escape" side="left">
 <button
 						type="button"

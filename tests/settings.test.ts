@@ -31,7 +31,6 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		assert.equal(a.background, null); // the mode's own default, not a factory hex
 		assert.equal(a.fontFamily, null); // Source Sans 3
 		assert.equal(a.proseFontSize, 16);
-		assert.equal(a.sessionNameSerif, true);
 		assert.equal(a.mdRendering.headingWeight, 900);
 		assert.equal(a.mdRendering.boldColor, null); // white
 		assert.equal(a.mdRendering.italicColor, null);
@@ -75,7 +74,6 @@ describe("sanitizeUserSettings", () => {
 				background: "#ffffff",
 				fontFamily: "Some Font",
 				proseFontSize: 18,
-				sessionNameSerif: false,
 				mdRendering: { headingWeight: 700, boldColor: "#ff8800", italicColor: null },
 			},
 			graph: { enabled: false },
@@ -101,7 +99,9 @@ describe("sanitizeUserSettings", () => {
 		const out = sanitizeUserSettings({
 			general: { autoUpdate: "yes" },
 			agent: { tools: { research: "no" }, prompts: { "system-prompt.md": 1 }, models: { researcher: "fast" } },
-			appearance: { mode: "sepia", sessionNameSerif: "true" },
+			// sessionNameSerif is the retired serif toggle (UI rework): a settings
+			// file that still carries it loads, and the key drops.
+			appearance: { mode: "sepia", sessionNameSerif: true },
 			graph: { enabled: 0 },
 		});
 		assert.ok(out);

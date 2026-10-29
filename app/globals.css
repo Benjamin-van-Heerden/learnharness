@@ -109,15 +109,6 @@
 	--lh-heading-weight: 900;
 }
 
-/* CMU Serif bold (titles) — bundled local file, no CDN dependency. */
-@font-face {
-	font-family: "lh-cmu";
-	src: url("/fonts/cmunbx.ttf") format("truetype");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
-}
-
 @theme inline {
 	/* Fonts: chrome = JetBrains Mono, prose = Source Sans 3, titles = CMU
 	   Serif bold. The JetBrains/SourceSans variables attach in app/layout.tsx.
@@ -136,12 +127,8 @@
 	   legibility floor; quiet labels get their quiet from color +
 	   tracking, not a notch of size. Reading prose = the 16px rung via
 	   --lh-prose-size.) */
-	/* --font-title lives in the NON-inline @theme below: inline tokens get
-	   their literal values baked into the utilities (.font-title{font-family:
-	   lh-cmu,serif}), which made the appearance "session names in serif"
-	   toggle write a runtime --font-title no consumer ever read (owner, fix
-	   wave: toggle looked dead). Non-inline emits :root { --font-title: … }
-	   and the utility reads var(--font-title) — appearance overrides win. */
+	/* --font-title lives in the NON-inline @theme below: non-inline emits
+	   :root { --font-title: … } and the utility reads var(--font-title). */
 	--text-xs: 11px;
 	--text-xs--line-height: 1.4;
 	--text-sm: 12.5px;
@@ -223,16 +210,6 @@ body {
 	font-family: var(--font-prose);
 	font-size: var(--lh-prose-size);
 	line-height: var(--lh-prose-leading);
-}
-
-/* Session-name weight (owner, fix wave round 3): with the serif toggle
-   OFF, --font-title resolves to the prose font — Source Sans 3 is loaded
-   as a VARIABLE font, and without an explicit weight the titles render at
-   400, a whisper next to CMU's bold-only face. Request 900: the variable
-   font takes it, and CMU (a single 700 face) snaps to its nearest
-   available weight — the same rendering it already had. */
-.font-title {
-	font-weight: 900;
 }
 
 /* Links read GitHub's lighter link blue; streamdown paints them
@@ -595,11 +572,12 @@ body {
 	max-width: max(0px, calc(100% - 5.5rem - var(--lh-wco-right, 0px)));
 }
 
-/* --font-title deliberately NOT @theme inline (see comment above): the
-   session-name-serif toggle overrides this var at runtime, so the
-   .font-title utility must read it through var(), not carry a baked copy. */
+/* Titles (FORK, UI rework): JetBrains Mono, the chrome font. The weight
+   rides at each use (font-semibold on headings, regular in the sidebar),
+   since an unlayered weight here would beat those utilities. The CMU Serif
+   face and the "session names in serif" toggle are gone. */
 @theme {
-	--font-title: "lh-cmu", serif;
+	--font-title: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 }
 
 /* Card enter (owner round, 2026-10-05): the transcript cards' one-shot

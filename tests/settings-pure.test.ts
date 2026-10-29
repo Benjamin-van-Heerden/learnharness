@@ -30,7 +30,6 @@ describe("resolveAppearance — delta over factory", () => {
 		assert.equal(a.background, null);
 		assert.equal(a.fontFamily, null);
 		assert.equal(a.proseFontSize, 16);
-		assert.equal(a.sessionNameSerif, true);
 		assert.deepEqual(a.mdRendering, { headingWeight: 900, boldColor: null, italicColor: null });
 	});
 
@@ -74,7 +73,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--lh-prose-size"], "16px");
 		assert.equal(vars["--lh-heading-weight"], "900");
 		assert.equal(vars["--font-prose"], undefined, "no font override at factory");
-		assert.equal(vars["--font-title"], undefined, "CMU stays");
+		assert.equal(vars["--font-title"], undefined, "titles are never overridden at runtime");
 		assert.equal(vars["--background"], undefined, "factory palette untouched");
 		assert.equal(vars["--lh-ink-strong"], undefined, "default ink");
 	});
@@ -85,7 +84,6 @@ describe("appearanceVars — the mapping the provider applies", () => {
 				background: "#101820",
 				fontFamily: "Georgia",
 				proseFontSize: 18,
-				sessionNameSerif: false,
 				mdRendering: { headingWeight: 700, boldColor: "#ff0000", italicColor: "#00ff00" },
 			}),
 		);
@@ -93,16 +91,9 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--card"], "#1a222a", "raised +10 per channel: 10→1a, 18→22, 20→2a");
 		assert.equal(vars["--font-prose"], `"Georgia", var(--font-sans3), ui-sans-serif, system-ui, sans-serif`);
 		assert.equal(vars["--lh-prose-size"], "18px");
-		assert.equal(vars["--font-title"], "var(--font-prose)", "serif off → titles follow the prose font");
 		assert.equal(vars["--lh-heading-weight"], "700");
 		assert.equal(vars["--lh-ink-strong"], "#ff0000");
 		assert.equal(vars["--lh-ink-italic"], "#00ff00");
-	});
-
-	it("sessionNameSerif false alone: titles move, nothing else does", () => {
-		const vars = appearanceVars(resolveAppearance({ sessionNameSerif: false }));
-		assert.equal(vars["--font-title"], "var(--font-prose)");
-		assert.equal(Object.keys(vars).length, 3, "prose-size, heading-weight, font-title only");
 	});
 });
 
@@ -112,7 +103,6 @@ describe("staleVarNames — the removal half of application (owner repro: resets
 			resolveAppearance({
 				background: "#101820",
 				fontFamily: "Georgia",
-				sessionNameSerif: false,
 				mdRendering: { headingWeight: 700, boldColor: "#ff0000", italicColor: "#00ff00" },
 			}),
 		);
@@ -121,7 +111,6 @@ describe("staleVarNames — the removal half of application (owner repro: resets
 		const stale = staleVarNames(applied, factory);
 		assert.ok(stale.includes("--background"));
 		assert.ok(stale.includes("--font-prose"));
-		assert.ok(stale.includes("--font-title"), "serif toggle back ON must clear the title override");
 		assert.ok(stale.includes("--lh-ink-strong"));
 		assert.ok(stale.includes("--lh-ink-italic"));
 		assert.ok(!stale.includes("--lh-prose-size"), "always-applied tokens never go stale");
