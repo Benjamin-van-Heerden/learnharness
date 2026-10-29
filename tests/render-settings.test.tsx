@@ -235,6 +235,13 @@ describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", 
 		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "absent record = factory ON");
 	});
 
+	it("carries the Import notes row (moved here from the home and graph chrome in the fork)", () => {
+		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
+		assert.ok(html.includes('data-testid="graph-row-import-notes"'));
+		assert.ok(html.includes('data-testid="import-notes"'));
+		assert.ok(html.includes('accept=".md,.markdown,.txt"'));
+	});
+
 	it("a stored off record shows the extraction switch off", () => {
 		const html = renderToStaticMarkup(<GraphSection graph={{ enabled: false }} onSectionChange={() => {}} />);
 		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="false"'));

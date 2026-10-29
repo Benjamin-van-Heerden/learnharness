@@ -257,9 +257,10 @@ body {
    paragraphs: a tighter 1.25 leading brings the caret to the font-metric
    floor (~20px, as close to the glyphs as Chromium will draw it) while
    wrapped lines in growing textareas still read fine. Rendered prose keeps
-   1.5 — the two share family and size, they differ only in leading. */
+   1.5. Typing fields are JetBrains Mono, the chrome font, at the reading
+   size (FORK, UI rework: the user's ruling; prose stays Source Sans 3). */
 .lh-input {
-	font-family: var(--font-prose);
+	font-family: var(--font-ui);
 	font-size: var(--lh-prose-size);
 	line-height: 1.25;
 }

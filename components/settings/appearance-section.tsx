@@ -42,6 +42,7 @@ import { Hint } from "@/components/ui/hint";
 import { useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
 import { CommitInput, SettingsMenuTrigger, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
+import { NotesImportRow } from "./notes-import-row.tsx";
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
@@ -409,6 +410,7 @@ export function GraphSection({
 					}}
 				/>
 			</SettingsRow>
+			<NotesImportRow />
 		</>
 	);
 }

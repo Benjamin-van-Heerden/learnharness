@@ -110,7 +110,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 
 ### Shell (`app/`, `components/`)
 - `components/chat.tsx`, `session.ts`, `session-core.ts`: the session view and its client state; `question-dock.tsx` (quizzes), `practice-dock.tsx` + `practice-cards.tsx` (practice problems), `plan-window.tsx` / `plan-block.tsx`, `activity-dock.tsx`, `composer.tsx`, `dictation.tsx`.
-- `home.tsx`, `graph-view.tsx`, `graph-canvas.ts` (Canvas 2D renderer), `chain-table.tsx` (chain management and deletion), `notes-import.tsx`.
+- `home.tsx`, `graph-view.tsx`, `graph-canvas.ts` (Canvas 2D renderer), `chain-table.tsx` (chain management and deletion), `notes-import.tsx` (the import hook; fork: its only button is the Settings → Graph row, `settings/notes-import-row.tsx`).
 - `server-events.tsx`: the single `EventSource` per window.
 - `working-line.ts` (fork): when the session view shows its WORKING… line (a turn runs but nothing moves); `elapsed-seconds.ts` (fork): the live seconds tick on the thinking row and live tool cards.
 - `file-path-drop-zone.tsx`, `path-input.tsx` (+ `path-input-dom.ts`), `file-path-chip.tsx`: desktop drag-and-drop of local file paths into drafts as quoted path chips (`src/core/file-paths.ts`); nothing is uploaded.

@@ -64,14 +64,12 @@
  */
 
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import Link from "next/link";
-import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
+import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, WaypointsIcon } from "lucide-react";
 import { incrementalLayout, propositionSessionHref, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { planCostLabel } from "@/components/usage-format";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
-import { useActivity } from "@/components/activity-dock";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { MenuShell } from "@/components/menu-shell.tsx";
 import { DeleteNodeDialog } from "@/components/delete-node-dialog.tsx";
@@ -842,10 +840,7 @@ export function GraphChromeRow({
 	query,
 	onQuery,
 	noMatch,
-	importing,
 	searchInputRef,
-	fileInputRef,
-	onImportFiles,
 	settings,
 	changeSettings,
 	onOpenChains,
@@ -856,10 +851,7 @@ export function GraphChromeRow({
 	/** The search panel's "No matching nodes." note (computed by the
 	 *  wrapper — it owns visibleIds + the snapshot). */
 	noMatch: boolean;
-	importing: boolean;
 	searchInputRef: React.RefObject<HTMLInputElement | null>;
-	fileInputRef: React.RefObject<HTMLInputElement | null>;
-	onImportFiles: (files: FileList | null) => void;
 	settings: GraphRenderSettings;
 	changeSettings: (update: (cur: RenderSettings) => RenderSettings) => void;
 	/** Opens the chain table overlay (the chains-overlay plan,
@@ -911,39 +903,6 @@ export function GraphChromeRow({
 					</Hint>
 				</div>
 			)}
-			{/* Import notes — its own container (36px, header band); ALWAYS
-			    rendered (the empty-graph ruling above — the entry point). */}
-			<div className="shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
-				<input
-					ref={fileInputRef}
-					type="file"
-					multiple
-					accept=".md,.markdown,.txt"
-					className="hidden"
-					onChange={(e) => {
-						onImportFiles(e.target.files);
-						e.target.value = ""; // allow re-picking the same file
-					}}
-				/>
-				<Hint
-					// The one button whose action isn't obvious from its label:
-					// the missing fact is where imports go (owner, subtlety
-					// round 2026-09-25).
-					label="Import notes into the graph"
-					side="bottom"
-				>
-					<button
-						type="button"
-						disabled={importing}
-						onClick={() => fileInputRef.current?.click()}
-						data-testid="import-notes"
-					className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
-				>
-						<UploadIcon className="size-3" />
-						{importing ? "Importing…" : "Import notes…"}
-					</button>
-				</Hint>
-			</div>
 			{!isEmpty && (
 				// Rendering settings — own component; the gear toggles it. The
 				// gear sits at the far right (owner, round 3) so its panel drops
@@ -1095,24 +1054,6 @@ export function GraphView({
 			cancelled = true;
 		};
 	}, [refreshTick]);
-
-	// Notes import (the format-agnostic front door): file picker → POST
-	// /api/graph/import; the runs surface in the status chips below, and the
-	// graph refetches when they finish (the runs-empty transition).
-	const fileInputRef = useRef<HTMLInputElement>(null);
-	// The dock's start-site nudge (accuracy wave, 2026-09-19): the import
-	// POST awaits the WHOLE pipeline server-side, so the run registers long
-	// before the response — nudge at click and again at +600ms to catch the
-	// start; from its first setPhase the run announces itself on the events
-	// channel (S5), and the dock rides those announcements thereafter.
-	const refreshActivity = useActivity().refresh;
-	const notesImport = useNotesImport({
-		onStart: () => {
-			refreshActivity();
-			setTimeout(() => refreshActivity(), 600);
-		},
-	});
-	const { importing, onImportFiles } = notesImport;
 
 	// Background pipeline status: read /api/graph/status; whenever a run
 	// LEAVES the feed (finished / aborted / failed), refetch the graph.
@@ -1500,7 +1441,7 @@ export function GraphView({
 						<WaypointsIcon className="size-10 opacity-40" strokeWidth={1.25} />
 						<div className="text-lg font-medium text-foreground">Knowledge graph</div>
 						<p className="max-w-sm text-sm">
-							Start a session or import notes to build your graph.
+							Start a session, or import notes in Settings → Graph, to build your graph.
 						</p>
 					</div>
 				</div>
@@ -1606,17 +1547,13 @@ export function GraphView({
 					query={query}
 					onQuery={setQuery}
 					noMatch={snapshot !== null && visibleIds.size === 0 && query.trim() !== ""}
-					importing={importing}
 					searchInputRef={searchInputRef}
-					fileInputRef={fileInputRef}
-					onImportFiles={onImportFiles}
 					settings={settings}
 					changeSettings={changeSettings}
 					onOpenChains={() => setChainsOpen(true)}
 				/>
 			</div>
 
-			<NotesImportErrors errors={notesImport.errors} />
 			{/* Top-right tail (owner, 2026-09-20): the pipeline cost number —
 			    just a number, hover-highlighted, dropdown breakdown — then
 			    the running-pipeline pills under it. Lives BELOW the actions

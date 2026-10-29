@@ -18,11 +18,10 @@
  * The practice pick flow mirrors GraphView's contract verbatim (home
  * lifts the pick set; the chip opens the overlay in select mode).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ListTreeIcon, UploadIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ListTreeIcon } from "lucide-react";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { GraphCostControl } from "@/components/graph-view.tsx";
-import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import { Hint } from "@/components/ui/hint";
 import type { ChatSummary, GraphCostSummary, GraphSnapshot } from "@/src/core";
 
@@ -73,7 +72,7 @@ export function KnowledgeSummary({
 			</p>
 			{empty && (
 				<p className="pt-2 font-ui text-xs text-muted-foreground/70">
-					Nothing here yet — import notes to begin building the graph.
+					Nothing here yet — start a session, or import notes in Settings → Graph.
 				</p>
 			)}
 		</div>
@@ -97,7 +96,6 @@ export function MinimalHome({
 	const [costs, setCosts] = useState<GraphCostSummary | null>(null);
 	const [chats, setChats] = useState<ChatSummary[]>([]);
 	const [chainsOpen, setChainsOpen] = useState(false);
-	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const readState = useCallback(() => {
 		fetch("/api/graph")
@@ -123,27 +121,11 @@ export function MinimalHome({
 		if (chainSelectOpen) setChainsOpen(true);
 	}, [chainSelectOpen]);
 
-	// Refetch even after incomplete imports: earlier writes and spend remain.
-	const notesImport = useNotesImport({ onFinish: readState });
-	const { importing, onImportFiles } = notesImport;
-
 	const teachSessions = chats.filter((c) => c.kind === "teach").length;
 	const practiceSessions = chats.filter((c) => c.kind === "practice").length;
 
 	return (
 		<div className="relative h-full">
-			<input
-				ref={fileInputRef}
-				type="file"
-				multiple
-				accept=".md,.markdown,.txt"
-				className="hidden"
-				onChange={(e) => {
-					onImportFiles(e.target.files);
-					e.target.value = ""; // allow re-picking the same file
-				}}
-			/>
-
 			{/* The quiet summary — centered, biased up off the composer. */}
 			<div className="pointer-events-none flex h-full items-center justify-center pb-40">
 				<KnowledgeSummary
@@ -179,22 +161,7 @@ export function MinimalHome({
 							</button>
 						</Hint>
 					</div>
-					<div className="shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
-						<Hint label="Import notes into the graph" side="bottom">
-							<button
-								type="button"
-								disabled={importing}
-								onClick={() => fileInputRef.current?.click()}
-								data-testid="import-notes"
-								className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
-							>
-								<UploadIcon className="size-3" />
-								{importing ? "Importing…" : "Import notes…"}
-							</button>
-						</Hint>
-					</div>
 				</div>
-				<NotesImportErrors errors={notesImport.errors} />
 				{costs && costs.runs.length > 0 && <GraphCostControl costs={costs} />}
 			</div>
 
