@@ -78,15 +78,17 @@ test("Providers is the first/default page; General is last and other pages keep 
  assert.doesNotMatch(html, />Model providers<\/button>/);
 });
 
-test("Providers has exactly four ordered sections; unknown variables stay masked/read-only at the end of Model API keys", async () => {
+test("Providers has five ordered sections including External CLI; unknown variables stay masked/read-only at the end of Model API keys", async () => {
  globalThis.fetch = async (url) => {
+  if (url === "/api/claude-code") return Response.json({ state: "not-found", version: null, minimumVersion: "2.1.259" });
   assert.equal(url, "/api/keys");
   return Response.json({ providers: [{ id: "openai", envVar: "OPENAI_API_KEY", label: "OpenAI" }], keys: [{ id: "FUTURE_VAR", info: null, present: true, masked: "…abcd", source: "file", shadowedByEnv: false }] });
  };
  fixture(); await mount(<KeysSection />);
  const headings = [...document.querySelectorAll('[data-testid^="group-"] > p')].map((el) => el.textContent);
  // FORK: the Dictation group is hidden with the dictation UI (DICTATION_UI).
- assert.deepEqual(headings, ["Model API keys", "Subscriptions", ...(DICTATION_UI ? ["Dictation"] : []), "Search"]);
+ assert.deepEqual(headings, ["Model API keys", "Subscriptions", "External CLI", ...(DICTATION_UI ? ["Dictation"] : []), "Search"]);
+ assert(byTest("claude-code-installation").closest('[data-testid="group-external-cli"]'));
  if (DICTATION_UI) assert(byTest("key-deepgram_api_key").closest('[data-testid="group-dictation"]'));
  else assert.equal(document.querySelector('[data-testid="key-deepgram_api_key"]'), null);
  assert(byTest("key-tavily_api_key").closest('[data-testid="group-search"]'));
