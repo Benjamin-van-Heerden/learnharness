@@ -168,6 +168,8 @@ Storage is **per-entity semantic ports**, never one generic interface: `ChatStor
 
 The engine side is adapted too: `src/agent/models.ts` (`piEngineFor`, `piEngineForSpec`) resolves each role's engine from the user's **model slots** (BYOK: `settings.json` `models` section — strong/cheap/vision; a chain that ends empty refuses honestly with 503 `models_not_configured`) — and the teacher/prober conversation runs the **SESSION'S OWN record**: `POST /api/chats` stamps every newborn verbatim from the strong slot (the new-session default, chosen in setup), in-session picks write the session's record (`PUT /api/chats/:id/settings`), and the strong slot never reaches an existing session again (legacy unstamped records fall back to it at resolve time) — per-session models, owner 2026-09-28. Records are pi-native: a chat record stores `LhMessage`s (`src/core/native-messages.ts` — pi's user/assistant/toolResult messages plus `role: "custom"` markers such as `probe-handoff`, `plan-block`, `graph-context`, `subagent-steer`, `subagent-abort`, `compaction` and the practice markers), so replay is `asAgentMessages(record.messages)` with no translation; dangling tool calls (an aborted turn) get synthesized interrupted results (`INTERRUPTED_TEXT`). `src/server/pi/ui-stream.ts` (`runPiTurn`) streams the turn's own pi `AgentEvent`s as SSE to every view (the native wire), and `call-ids.ts` uniquifies tool-call ids for providers that reuse them.
 
+**Session titles (fork, UI rework).** `POST /api/chats` titles a new session with its truncated opening prompt (`titleFromPrompt`), then fires `titleSessionInBackground` (`chat-handler.ts`). That resolves the `titler` background role (role override, then the cheap slot), skipping silently with no model, no key or no background consent, and runs one tool-less call (`src/server/session-title.ts`) for a 3–6 word sentence-case phrase. The chat record's `titleSource` (`"prompt"`, the default when absent; `"model"`; `"user"`) guards the write: the model title lands only over a `"prompt"` title, and a hand rename (`PUT /api/chats/[id]`, `"user"`) always wins, even mid-call. The write goes through `renameChat` (so `chats-changed`), plus `chat-titled` for an open header. Title calls record no usage.
+
 ```mermaid
 flowchart LR
     subgraph DRIVING["DRIVING ADAPTERS — inbound"]
@@ -506,6 +508,7 @@ Before 2026-10-02 the client discovered server-side change by polling: a lattice
 | `subscriptions-changed` | `{}` | web/dev subscription state changes (`server/web-subscriptions.ts`) — no account or credential data |
 | `record-changed` | `{chatId}` | a record write without a turn: silent dismissal (`/api/chats/[id]/dismiss`, `dismissal-park.ts`), an answer saved while another question is open (`chat-handler.ts`), compaction's marker (`server/compaction.ts`) |
 | `compaction-changed` | `{chatId, running}` | compaction start/finish (`server/compaction.ts`); `running` is the send gate the composer and docks mirror |
+| `chat-titled` | `{chatId, title}` | fork: the titler named a session (`server/session-title.ts`), after its `renameChat` write. The open header adopts the title even mid-turn, when `record-changed` is ignored |
 
 ### 10.3 Emitter laws
 
@@ -566,6 +569,9 @@ Every place the architecture is designed to be cut — the "one file" a future c
 | Desktop host | `electron/main.cjs` | launcher/security shell only |
 | Fork local build | `scripts/desktop-local.sh` + `lhLocalBuild` (`electron/main.cjs`) | how the fork's daily app is built, and that it never takes upstream's updates |
 | Fork data folder | `electron/data-location.cjs` + `electron/data-folder.cjs`, `components/settings/data-folder-settings.tsx` | where the desktop app's data/ lives, and moving it safely |
+| Fork UI rework | `app/globals.css` tokens, `components/ui/button.tsx` | the look: the GitHub Dark palette with the blue primary (and `derivedPalette`'s +10/+21/+36 curve in `components/settings/appearance.tsx`, which no longer derives `--primary-foreground`), every `--radius*` at 0 with `chamfer-sm` on buttons, Studii's `bg-hatch` on `body`, and JetBrains Mono titles (`--font-title`; the CMU Serif face and the serif toggle are removed). `rounded-full` pills stay round |
+| Fork session titles | `src/server/session-title.ts`, the `titler` role (`ROLE_SLOT.titler = "cheap"`) | who names a session and when; see "Session titles" in §3 |
+| Fork working indicators | `components/working-line.ts`, `components/elapsed-seconds.ts`, `SessionState.messageStreaming` | the WORKING… line between steps, and live seconds on the thinking row and live tool cards (settled rows keep the static label) |
 | Fork dictation UI | `DICTATION_UI` (`src/core/dictation.ts`) | hides dictation in this fork: `DictationBar` renders nothing, Settings → Providers has no Dictation group, and Mod+D is unbound; the STT route and dictation code stay for clean upstream merges |
 
 ---

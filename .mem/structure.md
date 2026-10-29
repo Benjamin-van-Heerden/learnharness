@@ -46,7 +46,7 @@ docs/                design docs: architecture.md (ours), fork-workflow.md (ours
 lib/utils.ts         cn() only (clsx + tailwind-merge)
 config.ts            path constants and model-role types (repo root)
 proxy.ts             Next 16 proxy guarding /api/* in desktop mode
-public/              fonts, audio worklet (pcm-capture.js)
+public/              audio worklet (pcm-capture.js)
 build/               desktop icons
 data/                runtime state, git-ignored (relocated by LH_DATA_DIR)
 .mem/                mem config, specs, this doc; runnables/ run at onboard:
@@ -87,6 +87,7 @@ Paths come from `config.ts` (`PATHS`, `LEDGER_FILES`, `SOURCES_FILE`, `POSITIONS
 - `chat-handler.ts`: turn composition root, `handleChatRequest(req, buildAgent?)` → `handleChatInput`. Chooses the agent: `createPracticeAgent` when `record.kind === "practice"`, else `createTeacherAgent` once `hasProbeDone`, else `createProberAgent`.
 - `turn-service.ts` (`persistTurn`, `triggerExtraction`), `turn-liveness.ts` (`beginTurn`/`endTurn`/`isTurnRunning`, one turn per chat), `turn-runs.ts` (chatId → running turn handle; `abortTurn`, reattach), `pi/ui-stream.ts` (`runPiTurn`, `piTurnResponse`: streams pi agent events as SSE).
 - `compaction.ts`: `ensureCompacted`, `kickCompaction` (context summarizing via a sub-agent).
+- `session-title.ts` (fork): the `titler` role names a new session from its opening prompt in the background (`titleSession`, wired by `chat-handler.ts`'s `titleSessionInBackground`, fired from `POST /api/chats`); it only replaces a `titleSource: "prompt"` title and announces `chat-titled`.
 - `jobs.ts`: steer delivery of background job results back into sessions (`deliverJobResult`, `setTurnRunner`, `registerLiveAgent`, `steerLiveChat`, `recoverStaleJobs`, `abortJob`).
 - `dismissal-park.ts`: ESC dismissal of an open question or problem (`applyParkedDismissal`).
 - `events-stream.ts`: the `GET /api/events` SSE seam over `core/events.ts`.
@@ -111,6 +112,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 - `components/chat.tsx`, `session.ts`, `session-core.ts`: the session view and its client state; `question-dock.tsx` (quizzes), `practice-dock.tsx` + `practice-cards.tsx` (practice problems), `plan-window.tsx` / `plan-block.tsx`, `activity-dock.tsx`, `composer.tsx`, `dictation.tsx`.
 - `home.tsx`, `graph-view.tsx`, `graph-canvas.ts` (Canvas 2D renderer), `chain-table.tsx` (chain management and deletion), `notes-import.tsx`.
 - `server-events.tsx`: the single `EventSource` per window.
+- `working-line.ts` (fork): when the session view shows its WORKING… line (a turn runs but nothing moves); `elapsed-seconds.ts` (fork): the live seconds tick on the thinking row and live tool cards.
 - `file-path-drop-zone.tsx`, `path-input.tsx` (+ `path-input-dom.ts`), `file-path-chip.tsx`: desktop drag-and-drop of local file paths into drafts as quoted path chips (`src/core/file-paths.ts`); nothing is uploaded.
 - `artifacts/`: renderers for job results and tool cards.
 
