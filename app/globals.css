@@ -202,8 +202,16 @@
 	clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--chamfer-sm)), calc(100% - var(--chamfer-sm)) 100%, 0 100%);
 }
 
+/* Studii's signed-in background, verbatim (FORK, UI rework): 1px
+   diagonals every 7px at 7% of the text color. It reads --background and
+   --foreground, so a custom Appearance background carries it. */
+@utility bg-hatch {
+	background-color: var(--background);
+	background-image: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--foreground) 7%, transparent) 0 1px, transparent 1px 7px);
+}
+
 body {
-	background: var(--color-background);
+	@apply bg-hatch;
 	color: var(--color-foreground);
 	font-family: var(--font-ui);
 }

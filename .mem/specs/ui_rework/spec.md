@@ -15,7 +15,7 @@ The look is borrowed from the user's studii-next app (`~/Documents/Studii/studii
 ## Goals
 
 - GitHub Dark (default) is the built-in palette, with GitHub's blue as the accent.
-- Studii's `bg-hatch` behind the page. The chat's reading column stays solid.
+- Studii's `bg-hatch` behind the page, including under the chat prose.
 - Square corners everywhere, and Studii's bottom-right chamfer on buttons.
 - Session titles and dialog headings in JetBrains Mono. The serif toggle and CMU Serif are removed.
 - A new `titler` background role, on the cheap slot by default, writes a 3–6 word sentence-case title from the first message. Hand renames are never overwritten.
@@ -24,7 +24,7 @@ The look is borrowed from the user's studii-next app (`~/Documents/Studii/studii
 ## Decisions (user, 2026-10-29)
 
 - **Background:** Studii's hatch as-is.
-- **Hatch placement:** on the page, not under the reading column.
+- **Hatch placement:** on the page, not under the reading column. Revised during implementation: the chat prose spans the full content width (upstream's `COLUMN = max-w-none`), which leaves no margins, so the hatch now also sits under the prose, as in Studii (user, 2026-10-29).
 - **Corners:** Studii's style, square with a chamfer, applied as Studii does (buttons and badges only, not cards or dialogs).
 - **Palette:** GitHub Dark (default) as the built-in palette, with no preset picker. Use the blue accent.
 - **Other visual changes:** none for now.
@@ -71,7 +71,7 @@ Replace the remaining hard-coded `#141414` with `#0d1117`: `components/confidenc
 
 - Port Studii's utility verbatim: `@utility bg-hatch { background-color: var(--background); background-image: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--foreground) 7%, transparent) 0 1px, transparent 1px 7px); }`
 - Apply it to the app shell's page background, the element that today paints `bg-background` behind the sidebar and content.
-- The chat transcript's reading column gets a solid `bg-background` panel, so prose never sits on the lines. The panel spans the transcript and the composer column, full height, square, with no border unless the edge looks unfinished.
+- The hatch also sits under the chat transcript, as in Studii (revised: the prose column is full-width, so a solid column would hide the hatch in sessions entirely).
 - The home screen and the graph view show the hatch.
 - Every surface that should stay solid keeps its own background: sidebar, top bar, dialogs, popovers, docks.
 - Because the hatch reads `--background` and `--foreground`, a custom Background setting carries it automatically.
@@ -130,7 +130,7 @@ Replace the remaining hard-coded `#141414` with `#0d1117`: `components/confidenc
 
 - `app/globals.css` `:root` and `.dark` carry the GitHub Dark hexes in the table above, and `#141414` no longer appears in `app/`, `components/` or `src/` except in tests that assert the old value has changed.
 - The `--radius*` tokens are `0`. `globals.css` has no literal `border-radius` other than `9999px`/`rounded-full` uses. `buttonVariants` applies `chamfer-sm`.
-- The `bg-hatch` utility exists and is applied to the app shell. The chat reading column renders on a solid `bg-background`.
+- The `bg-hatch` utility exists and is applied to the app shell. The hatch shows behind the chat transcript as well.
 - `font-title` resolves to JetBrains Mono. `sessionNameSerif`, the serif row in Appearance, the CMU `@font-face` and `cmunbx.ttf` are gone, and settings files that still contain `sessionNameSerif` load without error.
 - `BACKGROUND_MODEL_ROLES` contains `titler` with `ROLE_SLOT.titler === "cheap"`. Agent settings lists "Session titles".
 - `POST /api/chats` with a prompt returns at once with the truncated title. A test with a fake titler engine shows the title replaced by the model's sanitized phrase and `titleSource: "model"`, and a `chats-changed` event emitted.
