@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ListTreeIcon } from "lucide-react";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { GraphCostControl } from "@/components/graph-view.tsx";
+import { useNotesImport } from "@/components/notes-import.tsx";
 import { Hint } from "@/components/ui/hint";
 import type { ChatSummary, GraphCostSummary, GraphSnapshot } from "@/src/core";
 
@@ -113,6 +114,8 @@ export function MinimalHome({
 	}, []);
 	useEffect(() => {
 		readState();
+		window.addEventListener("lh:graph-revision", readState);
+		return () => window.removeEventListener("lh:graph-revision", readState);
 	}, [readState]);
 
 	// The practice chip opens the table in select mode (GraphView's law):
@@ -120,6 +123,10 @@ export function MinimalHome({
 	useEffect(() => {
 		if (chainSelectOpen) setChainsOpen(true);
 	}, [chainSelectOpen]);
+
+	// Refetch even after incomplete imports: earlier writes and spend remain.
+	// The queue is page-wide, so an import started in Settings lands here too.
+	useNotesImport({ onFinish: readState });
 
 	const teachSessions = chats.filter((c) => c.kind === "teach").length;
 	const practiceSessions = chats.filter((c) => c.kind === "practice").length;
@@ -171,7 +178,7 @@ export function MinimalHome({
 			    order, so a full-bleed surface covering the drag band must
 			    paint after everything it covers. */}
 			<ChainTableOverlay
-				open={chainsOpen && (snapshot?.propositions.length ?? 0) > 0}
+				open={chainsOpen}
 				nodes={snapshot?.propositions ?? []}
 				chains={snapshot?.chains ?? []}
 				sessions={snapshot?.sessions ?? {}}

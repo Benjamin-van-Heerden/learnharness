@@ -72,6 +72,7 @@ Pure logic; storage arrives as parameters.
 |---|---|---|
 | `chats.ts` | `chatStore` | `data/chats/<id>.json`, one record per session |
 | `graph.ts` | `graphStore` | `data/graph/{nodes,chains,sessions,coverage}.jsonl`, `sources.json`, `positions.json` |
+| `source-organization.ts` | `sourceOrganizationStore` | `data/graph/source-organization.json` (imported display names, folders, placement) |
 | `graph-format.ts` | `assertGraphFormat`, `ensureGraphFormat` | `data/graph/format.json` version stamp |
 | `jobs.ts` | `jobStore` | `data/jobs/<id>.json` (path built from `PATHS.data`); emits `jobs-changed` |
 | `settings.ts` | `settingsStore` | `data/settings.json` |
@@ -87,6 +88,7 @@ Paths come from `config.ts` (`PATHS`, `LEDGER_FILES`, `SOURCES_FILE`, `POSITIONS
 - `chat-handler.ts`: turn composition root, `handleChatRequest(req, buildAgent?)` → `handleChatInput`. Chooses the agent: `createPracticeAgent` when `record.kind === "practice"`, else `createTeacherAgent` once `hasProbeDone`, else `createProberAgent`.
 - `turn-service.ts` (`persistTurn`, `triggerExtraction`), `turn-liveness.ts` (`beginTurn`/`endTurn`/`isTurnRunning`, one turn per chat), `turn-runs.ts` (chatId → running turn handle; `abortTurn`, reattach), `pi/ui-stream.ts` (`runPiTurn`, `piTurnResponse`: streams pi agent events as SSE).
 - `compaction.ts`: `ensureCompacted`, `kickCompaction` (context summarizing via a sub-agent).
+- `source-organization.ts`, `source-deletion.ts`: the source inventory's folders and renames, and contribution-safe deletion of whole sources (`/api/graph/sources`).
 - `session-title.ts` (fork): the `titler` role names a new session from its opening prompt in the background (`titleSession`, wired by `chat-handler.ts`'s `titleSessionInBackground`, fired from `POST /api/chats`); it only replaces a `titleSource: "prompt"` title and announces `chat-titled`.
 - `jobs.ts`: steer delivery of background job results back into sessions (`deliverJobResult`, `setTurnRunner`, `registerLiveAgent`, `steerLiveChat`, `recoverStaleJobs`, `abortJob`).
 - `dismissal-park.ts`: ESC dismissal of an open question or problem (`applyParkedDismissal`).
@@ -110,7 +112,7 @@ Dependencies arrive by factory arguments; never imports `server` or `store`.
 
 ### Shell (`app/`, `components/`)
 - `components/chat.tsx`, `session.ts`, `session-core.ts`: the session view and its client state; `question-dock.tsx` (quizzes), `practice-dock.tsx` + `practice-cards.tsx` (practice problems), `plan-window.tsx` / `plan-block.tsx`, `activity-dock.tsx`, `composer.tsx`, `dictation.tsx`.
-- `home.tsx`, `graph-view.tsx`, `graph-canvas.ts` (Canvas 2D renderer), `chain-table.tsx` (chain management and deletion), `notes-import.tsx` (the import hook; fork: its only button is the Settings → Graph row, `settings/notes-import-row.tsx`).
+- `home.tsx`, `graph-view.tsx`, `graph-canvas.ts` (Canvas 2D renderer), `chain-table.tsx` (chain management and deletion), `notes-import.tsx` + `notes-import-queue.ts` (the page-wide import queue; fork: the only entry point is the Settings → Graph row, `settings/notes-import-row.tsx`), `source-folder-tree.tsx` + `delete-source-dialog.tsx` (source folders in the chain view).
 - `server-events.tsx`: the single `EventSource` per window.
 - `working-line.ts` (fork): when the session view shows its WORKING… line (a turn runs but nothing moves); `elapsed-seconds.ts` (fork): the live seconds tick on the thinking row and live tool cards.
 - `file-path-drop-zone.tsx`, `path-input.tsx` (+ `path-input-dom.ts`), `file-path-chip.tsx`: desktop drag-and-drop of local file paths into drafts as quoted path chips (`src/core/file-paths.ts`); nothing is uploaded.

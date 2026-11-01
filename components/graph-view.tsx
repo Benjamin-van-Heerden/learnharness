@@ -828,9 +828,9 @@ function GraphSettingsControl({
 }
 
 /** The top-chrome actions row's body (empty-graph chrome wave, owner
- *  2026-09-25): Import Notes renders ALWAYS (graph enabled) — it's the
- *  one action that works on an empty graph, the entry point itself;
- *  search + settings render only when the snapshot has nodes (dead
+ *  2026-09-25): the source inventory renders ALWAYS (chats and files can
+ *  exist with no graph nodes; Import notes lives in Settings → Graph in
+ *  the fork); search + settings render only when the snapshot has nodes (dead
  *  controls are lies — the honesty principle). The two gated controls
  *  fade in on their mount (graph-chrome-fade-in, globals.css — the
  *  appear-once transition as the first nodes land). Exported pure for
@@ -887,9 +887,8 @@ export function GraphChromeRow({
 				</div>
 			)}
 			{/* The chain table (chains overlay, owner plan 2026-09-29). Own
-			    container (36px band), between the search and Import. */}
-			{!isEmpty && (
-				<div className="graph-chrome-fade-in shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
+			    container (36px band), after the search. */}
+			<div className="graph-chrome-fade-in shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
 					<Hint label="Every reasoning chain" side="bottom">
 						<button
 							type="button"
@@ -902,7 +901,6 @@ export function GraphChromeRow({
 						</button>
 					</Hint>
 				</div>
-			)}
 			{!isEmpty && (
 				// Rendering settings — own component; the gear toggles it. The
 				// gear sits at the far right (owner, round 3) so its panel drops
@@ -945,14 +943,8 @@ export function GraphView({
 
 	// Search panel state: the query text + the settings section toggle.
 	const [query, setQuery] = useState("");
-	// ⌘F (shortcut wave C): the find event focuses the node search —
-	// surface-scoped, dispatched as lh:kbd-find (only this page listens).
+	// Surface-scoped Find: the chains overlay owns it while open.
 	const searchInputRef = useRef<HTMLInputElement>(null);
-	useEffect(() => {
-		const onFind = () => searchInputRef.current?.focus();
-		window.addEventListener("lh:kbd-find", onFind);
-		return () => window.removeEventListener("lh:kbd-find", onFind);
-	}, []);
 	// Render settings: SERVER-persisted (data/render-settings.json via
 	// /api/graph/render-settings) — sizes AND the region/physics sections
 	// (user-facing since 2026-09-13; the dev-session era is over). Loaded
@@ -1036,6 +1028,12 @@ export function GraphView({
 	// The chain table overlay (chains-overlay plan, 2026-09-29) —
 	// component-local: a browsing surface, not graph state.
 	const [chainsOpen, setChainsOpen] = useState(false);
+	useEffect(() => {
+		if (chainsOpen) return;
+		const onFind = () => searchInputRef.current?.focus();
+		window.addEventListener("lh:kbd-find", onFind);
+		return () => window.removeEventListener("lh:kbd-find", onFind);
+	}, [chainsOpen]);
 	// PRACTICE SELECT (2026-10-04): the parent's chip drives the select
 	// mode; closing (either the picker's confirm or its X) reports back so
 	// the chip's open state and the table's never disagree.
@@ -1169,8 +1167,15 @@ export function GraphView({
 			rendererRef.current?.setClusterLabels(new Map([[id, title]]));
 			setLabelTick((t) => t + 1);
 		};
+		const onSourceRenamed = (event: Event) => {
+			const { id, title } = (event as CustomEvent<{ id?: string; title?: string }>).detail ?? {};
+			if (typeof id !== "string" || typeof title !== "string") return;
+			// Label-only channel: never rebuild geometry or rewrite fileSources.
+			rendererRef.current?.setClusterLabels(new Map([[id, title]]));
+		};
 		window.addEventListener("lh:chat-renamed", onRenamed);
-		return () => window.removeEventListener("lh:chat-renamed", onRenamed);
+		window.addEventListener("lh:source-renamed", onSourceRenamed);
+		return () => { window.removeEventListener("lh:chat-renamed", onRenamed); window.removeEventListener("lh:source-renamed", onSourceRenamed); };
 	}, []);
 
 	// The node context menu (node interlude): right-click a node → Delete.
@@ -1540,8 +1545,8 @@ export function GraphView({
 			    its open dropdowns cover the number; clicks land on the panel. */}
 			<div className="relative z-20 flex min-w-0 items-start gap-2">
 				{/* The actions row (empty-graph chrome wave, owner 2026-09-25):
-				    Import Notes always — the empty graph's entry point; search +
-				    settings only when nodes exist, fading in on their mount. */}
+				    the source inventory always; search + settings only when nodes
+				    exist, fading in on their mount. */}
 				<GraphChromeRow
 					isEmpty={isEmpty}
 					query={query}
@@ -1636,7 +1641,7 @@ export function GraphView({
 			    covers. (DeleteNodeDialog is body-portaled — DOM-irrelevant
 			    here.) */}
 			<ChainTableOverlay
-				open={chainsOpen && !isEmpty}
+				open={chainsOpen}
 				nodes={snapshot?.propositions ?? []}
 				chains={snapshot?.chains ?? []}
 				sessions={snapshot?.sessions ?? {}}

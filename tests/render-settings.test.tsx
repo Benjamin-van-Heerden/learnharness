@@ -238,8 +238,10 @@ describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", 
 	it("carries the Import notes row (moved here from the home and graph chrome in the fork)", () => {
 		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
 		assert.ok(html.includes('data-testid="graph-row-import-notes"'));
-		assert.ok(html.includes('data-testid="import-notes"'));
-		assert.ok(html.includes('accept=".md,.markdown,.txt"'));
+		assert.ok(html.includes('data-testid="import-notes-files"'));
+		assert.ok(html.includes('data-testid="import-notes-folder"'));
+		assert.ok(html.includes('accept=".md,.markdown,.txt,.pdf"'), "the same formats as upstream's control");
+		assert.ok(html.includes("webkitdirectory"), "the folder picker");
 	});
 
 	it("a stored off record shows the extraction switch off", () => {
